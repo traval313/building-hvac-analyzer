@@ -44,6 +44,25 @@ const formatIssue = (issue: CsvParseIssue) => {
   return `${location}${issue.message}`;
 };
 
+const formatHours = (hours: number) => {
+  if (hours < 1) {
+    return `${Number((hours * 60).toFixed(2))} min`;
+  }
+
+  return `${Number(hours.toFixed(2))} hr`;
+};
+
+const getDatasetCoverageHours = (parseResult: CsvParseResult) => {
+  const firstRecord = parseResult.records[0];
+  const lastRecord = parseResult.records[parseResult.records.length - 1];
+
+  if (!firstRecord || !lastRecord) {
+    return 0;
+  }
+
+  return (lastRecord.intervalEndMs - firstRecord.timestampMs) / 3600000;
+};
+
 function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
@@ -150,6 +169,14 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
                 <div>
                   <dt>Records</dt>
                   <dd>{parseResult.records.length.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Coverage</dt>
+                  <dd>{formatHours(getDatasetCoverageHours(parseResult))}</dd>
+                </div>
+                <div>
+                  <dt>Typical interval</dt>
+                  <dd>{formatHours(parseResult.records.at(-1)?.intervalHours ?? 0)}</dd>
                 </div>
                 <div>
                   <dt>Temperature</dt>

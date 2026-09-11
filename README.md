@@ -19,6 +19,11 @@ Developed as part of the IBM SkillsBuild Micro-Internship for Trane Technologies
 
 Configure Building -> Upload CSV -> Validate -> Analyze -> Review Findings -> Review Recommendations
 
+## Sample Data
+
+Use [`sample-data/buildingpulse_test_after_hours.csv`](sample-data/buildingpulse_test_after_hours.csv)
+to test CSV upload, validation, hourly interval handling, and after-hours HVAC patterns.
+
 ## Documentation
 
 See [`docs/PRD.md`](docs/PRD.md) for the full product requirements.
