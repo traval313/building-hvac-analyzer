@@ -369,19 +369,39 @@ h1 {
 
 .file-summary dl div {
   display: grid;
-  grid-template-columns: 70px minmax(0, 1fr);
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
   gap: 12px;
+  align-items: start;
 }
 
 .file-summary dt {
   color: #607068;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .file-summary dd {
   margin: 0;
   color: #29352f;
   overflow-wrap: anywhere;
+}
+
+.parse-warnings {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ead7a8;
+  border-radius: 6px;
+  background: #fff8e7;
+}
+
+.parse-warnings ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #6d4b0d;
+  font-size: 0.88rem;
 }
 
 .file-actions {
