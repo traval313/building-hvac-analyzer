@@ -427,6 +427,34 @@ h1 {
   color: #4d5b54;
 }
 
+.analysis-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dce4d8;
+  border-radius: 8px;
+  background: #f8faf6;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 6px;
+  color: #231238;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
 .summary-label {
   color: #24745a;
   font-size: 0.78rem;
@@ -437,7 +465,8 @@ h1 {
 @media (max-width: 900px) {
   .topbar,
   .hero,
-  .workspace {
+  .workspace,
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 

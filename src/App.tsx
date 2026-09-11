@@ -1,22 +1,53 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
+import { calculateHvacEnergySummary } from './utils/hvacEnergy';
+
+const formatEnergy = (kwh: number) =>
+  `${Math.round(kwh).toLocaleString()} kWh`;
+
+const formatCost = (cost: number) =>
+  cost.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  });
 
 function App() {
+  const summaryRef = useRef<HTMLElement>(null);
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
   const [csvFile, setCsvFile] = useState<CsvUploadFile | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<CsvParseResult | null>(null);
+  const [shouldScrollToSummary, setShouldScrollToSummary] = useState(false);
+  const energySummary =
+    buildingConfig && csvParseResult
+      ? calculateHvacEnergySummary(csvParseResult.records, buildingConfig.electricityRate)
+      : null;
+
+  useEffect(() => {
+    if (!energySummary || !shouldScrollToSummary) {
+      return;
+    }
+
+    summaryRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+    setShouldScrollToSummary(false);
+  }, [energySummary, shouldScrollToSummary]);
 
   const handleCsvSelect = (file: CsvUploadFile, parseResult: CsvParseResult) => {
     setCsvFile(file);
     setCsvParseResult(parseResult);
+    setShouldScrollToSummary(true);
   };
 
   const handleCsvRemove = () => {
     setCsvFile(null);
     setCsvParseResult(null);
+    setShouldScrollToSummary(false);
   };
 
   return (
@@ -81,6 +112,37 @@ function App() {
           />
         </div>
       </section>
+
+      {energySummary && (
+        <section
+          className="panel analysis-panel"
+          aria-labelledby="energy-summary-title"
+          ref={summaryRef}
+        >
+          <div className="panel-heading">
+            <span>03</span>
+            <h2 id="energy-summary-title">HVAC Energy Summary</h2>
+          </div>
+          <div className="metric-grid">
+            <div className="metric">
+              <p className="summary-label">Total HVAC Energy</p>
+              <strong>{formatEnergy(energySummary.totalHvacEnergyKwh)}</strong>
+            </div>
+            <div className="metric">
+              <p className="summary-label">Occupied HVAC Energy</p>
+              <strong>{formatEnergy(energySummary.occupiedHvacEnergyKwh)}</strong>
+            </div>
+            <div className="metric">
+              <p className="summary-label">Unoccupied HVAC Energy</p>
+              <strong>{formatEnergy(energySummary.unoccupiedHvacEnergyKwh)}</strong>
+            </div>
+            <div className="metric">
+              <p className="summary-label">Electricity Cost</p>
+              <strong>{formatCost(energySummary.electricityCost)}</strong>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

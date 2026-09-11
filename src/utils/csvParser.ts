@@ -14,7 +14,7 @@ const intervalVarianceTolerance = 0.1;
 type HeaderIndex = Partial<Record<CsvColumn, number>>;
 type ParsedHvacCsvRecord = Omit<
   HvacCsvRecord,
-  'intervalEnd' | 'intervalEndMs' | 'intervalMs' | 'intervalHours' | 'intervalSource' | 'hvacKwh'
+  'intervalEnd' | 'intervalEndMs' | 'intervalMs' | 'intervalHours' | 'intervalSource'
 >;
 
 const normalizeHeader = (header: string) =>
@@ -401,7 +401,6 @@ export const parseCsvText = (csvText: string): CsvParseResult => {
             intervalMs,
             intervalHours,
             intervalSource: nextRecord ? 'next-record' : 'typical-final-record',
-            hvacKwh: record.hvacKw * intervalHours,
           };
         })
       : [];
