@@ -1,4 +1,10 @@
+import { useState } from 'react';
+import BuildingConfigForm from './components/BuildingConfigForm';
+import { BuildingConfig } from './types/buildingConfig';
+
 function App() {
+  const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
+
   return (
     <main className="app-shell">
       <header className="topbar" aria-label="Application header">
@@ -20,7 +26,7 @@ function App() {
         </div>
         <img
           className="hero-icon"
-          src="/temp-hvac-icon.png"
+          src="/buildingpulse-icon3.png"
           alt="HVAC analytics icon"
         />
       </section>
@@ -31,6 +37,21 @@ function App() {
             <span>01</span>
             <h2>Building Setup</h2>
           </div>
+          <BuildingConfigForm
+            initialConfig={buildingConfig}
+            onSubmit={setBuildingConfig}
+          />
+          {buildingConfig && (
+            <div className="config-summary" aria-live="polite">
+              <p className="summary-label">Saved configuration</p>
+              <h3>{buildingConfig.buildingName}</h3>
+              <p>
+                {buildingConfig.buildingType} building, ${buildingConfig.electricityRate.toFixed(4)}
+                /kWh
+              </p>
+              <p>{buildingConfig.normalOperatingDays.join(', ')}</p>
+            </div>
+          )}
         </div>
 
         <div className="panel upload-panel">
