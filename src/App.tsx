@@ -2,11 +2,22 @@ import { useState } from 'react';
 import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
 import { BuildingConfig } from './types/buildingConfig';
-import { CsvUploadFile } from './types/csvUpload';
+import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
 
 function App() {
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
   const [csvFile, setCsvFile] = useState<CsvUploadFile | null>(null);
+  const [csvParseResult, setCsvParseResult] = useState<CsvParseResult | null>(null);
+
+  const handleCsvSelect = (file: CsvUploadFile, parseResult: CsvParseResult) => {
+    setCsvFile(file);
+    setCsvParseResult(parseResult);
+  };
+
+  const handleCsvRemove = () => {
+    setCsvFile(null);
+    setCsvParseResult(null);
+  };
 
   return (
     <main className="app-shell">
@@ -64,8 +75,9 @@ function App() {
           </div>
           <CsvUpload
             selectedFile={csvFile}
-            onFileSelect={setCsvFile}
-            onFileRemove={() => setCsvFile(null)}
+            parseResult={csvParseResult}
+            onFileSelect={handleCsvSelect}
+            onFileRemove={handleCsvRemove}
           />
         </div>
       </section>

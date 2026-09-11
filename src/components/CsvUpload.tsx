@@ -1,9 +1,11 @@
 import { ChangeEvent, useRef, useState } from 'react';
-import { CsvUploadFile } from '../types/csvUpload';
+import { CsvParseIssue, CsvParseResult, CsvUploadFile } from '../types/csvUpload';
+import { parseCsvFile } from '../utils/csvParser';
 
 type CsvUploadProps = {
   selectedFile: CsvUploadFile | null;
-  onFileSelect: (file: CsvUploadFile) => void;
+  parseResult: CsvParseResult | null;
+  onFileSelect: (file: CsvUploadFile, parseResult: CsvParseResult) => void;
   onFileRemove: () => void;
 };
 
@@ -37,7 +39,12 @@ const formatFileSize = (size: number) => {
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
 };
 
-function CsvUpload({ selectedFile, onFileSelect, onFileRemove }: CsvUploadProps) {
+const formatIssue = (issue: CsvParseIssue) => {
+  const location = issue.row ? `Row ${issue.row}: ` : '';
+  return `${location}${issue.message}`;
+};
+
+function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -48,7 +55,7 @@ function CsvUpload({ selectedFile, onFileSelect, onFileRemove }: CsvUploadProps)
     }
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setError('');
 
@@ -63,10 +70,23 @@ function CsvUpload({ selectedFile, onFileSelect, onFileRemove }: CsvUploadProps)
     }
 
     setIsPreparing(true);
-    window.setTimeout(() => {
-      onFileSelect(file);
+
+    try {
+      const result = await parseCsvFile(file);
+
+      if (result.errors.length > 0) {
+        setError(result.errors.map(formatIssue).join(' '));
+        resetInput();
+        return;
+      }
+
+      onFileSelect(file, result);
+    } catch {
+      setError('Unable to read this CSV file.');
+      resetInput();
+    } finally {
       setIsPreparing(false);
-    }, 350);
+    }
   };
 
   const handleRemove = () => {
@@ -100,7 +120,7 @@ function CsvUpload({ selectedFile, onFileSelect, onFileRemove }: CsvUploadProps)
 
       {isPreparing && (
         <div className="upload-status" aria-live="polite" role="status">
-          Preparing file for the next step...
+          Parsing CSV records...
         </div>
       )}
 
@@ -125,7 +145,36 @@ function CsvUpload({ selectedFile, onFileSelect, onFileRemove }: CsvUploadProps)
               <dt>Type</dt>
               <dd>{selectedFile.type || 'Not provided'}</dd>
             </div>
+            {parseResult && (
+              <>
+                <div>
+                  <dt>Records</dt>
+                  <dd>{parseResult.records.length.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Temperature</dt>
+                  <dd>
+                    {parseResult.records.some(
+                      (record) =>
+                        record.indoorTempF !== undefined || record.outdoorTempF !== undefined,
+                    )
+                      ? 'Included'
+                      : 'Not included'}
+                  </dd>
+                </div>
+              </>
+            )}
           </dl>
+          {parseResult && parseResult.warnings.length > 0 && (
+            <div className="parse-warnings" role="status">
+              <p className="summary-label">Data warnings</p>
+              <ul>
+                {parseResult.warnings.map((warning) => (
+                  <li key={formatIssue(warning)}>{formatIssue(warning)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="file-actions">
             <button type="button" onClick={handleReplace}>
               Replace file
