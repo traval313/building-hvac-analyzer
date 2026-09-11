@@ -16,7 +16,6 @@ export type HvacCsvRecord = {
   intervalMs: number;
   intervalHours: number;
   intervalSource: 'next-record' | 'typical-final-record';
-  hvacKwh: number;
   occupied: boolean;
   hvacKw: number;
   indoorTempF?: number;
