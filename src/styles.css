@@ -65,8 +65,23 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 button:hover {
   background: #4c237b;
+}
+
+.secondary-button {
+  border: 1px solid #cbd7c6;
+  color: #29352f;
+  background: #ffffff;
+}
+
+.secondary-button:hover {
+  background: #f8faf6;
 }
 
 h1,
@@ -268,6 +283,111 @@ h1 {
   color: #b42318;
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+.csv-upload {
+  display: grid;
+  gap: 16px;
+}
+
+.csv-picker {
+  display: grid;
+  gap: 8px;
+  min-height: 160px;
+  padding: 22px;
+  place-items: center;
+  border: 1px dashed #aebdae;
+  border-radius: 8px;
+  color: #29352f;
+  background: #f8faf6;
+  text-align: center;
+  cursor: pointer;
+}
+
+.csv-picker:focus-within {
+  border-color: #5c2d91;
+  outline: 3px solid #efe5fa;
+}
+
+.csv-picker input {
+  width: min(100%, 280px);
+  cursor: pointer;
+}
+
+.csv-picker input::file-selector-button {
+  min-height: 38px;
+  margin-right: 12px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #5c2d91;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.csv-picker-title {
+  color: #231238;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.csv-picker-subtitle {
+  color: #607068;
+  font-size: 0.9rem;
+}
+
+.upload-status {
+  padding: 12px 14px;
+  border-radius: 6px;
+  color: #231238;
+  background: #f0e9f8;
+  font-weight: 800;
+}
+
+.file-summary {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dce4d8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.file-summary h3 {
+  margin: 0;
+  color: #231238;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.file-summary dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.file-summary dl div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.file-summary dt {
+  color: #607068;
+  font-weight: 800;
+}
+
+.file-summary dd {
+  margin: 0;
+  color: #29352f;
+  overflow-wrap: anywhere;
+}
+
+.file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .config-summary {
