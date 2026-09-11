@@ -8,8 +8,14 @@ import {
 
 const requiredColumns = ['timestamp', 'occupied', 'hvac_kw'] as const satisfies readonly CsvColumn[];
 const optionalTemperatureColumns = ['indoor_temp_f', 'outdoor_temp_f'] as const satisfies readonly CsvColumn[];
+const minimumDatasetHours = 24;
+const intervalVarianceTolerance = 0.1;
 
 type HeaderIndex = Partial<Record<CsvColumn, number>>;
+type ParsedHvacCsvRecord = Omit<
+  HvacCsvRecord,
+  'intervalEnd' | 'intervalEndMs' | 'intervalMs' | 'intervalHours' | 'intervalSource' | 'hvacKwh'
+>;
 
 const normalizeHeader = (header: string) =>
   header.replace(/^\uFEFF/, '').trim().toLowerCase();
@@ -135,6 +141,26 @@ const parseNumber = (rawValue: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const formatDuration = (durationMs: number) => {
+  const minutes = durationMs / 60000;
+
+  if (minutes < 60) {
+    return `${Number(minutes.toFixed(2))} minutes`;
+  }
+
+  const hours = minutes / 60;
+  return `${Number(hours.toFixed(2))} hours`;
+};
+
+const getMedianIntervalMs = (intervals: number[]) => {
+  const sortedIntervals = [...intervals].sort((left, right) => left - right);
+  const middleIndex = Math.floor(sortedIntervals.length / 2);
+
+  return sortedIntervals.length % 2 === 0
+    ? (sortedIntervals[middleIndex - 1] + sortedIntervals[middleIndex]) / 2
+    : sortedIntervals[middleIndex];
+};
+
 const getCell = (row: string[], headerIndex: HeaderIndex, column: CsvColumn) => {
   const columnIndex = headerIndex[column];
   return columnIndex === undefined ? undefined : row[columnIndex];
@@ -207,8 +233,7 @@ export const parseCsvText = (csvText: string): CsvParseResult => {
     };
   }
 
-  const records: HvacCsvRecord[] = [];
-  const timestampCounts = new Map<number, number>();
+  const parsedRecords: ParsedHvacCsvRecord[] = [];
 
   dataRows.forEach((row, rowIndex) => {
     const sourceRow = rowIndex + 2;
@@ -275,13 +300,10 @@ export const parseCsvText = (csvText: string): CsvParseResult => {
       return;
     }
 
-    const timestampMs = timestamp.getTime();
-    timestampCounts.set(timestampMs, (timestampCounts.get(timestampMs) ?? 0) + 1);
-
-    records.push({
+    parsedRecords.push({
       sourceRow,
       timestamp,
-      timestampMs,
+      timestampMs: timestamp.getTime(),
       occupied,
       hvacKw,
       ...(typeof indoorTempF === 'number' ? { indoorTempF } : {}),
@@ -289,24 +311,113 @@ export const parseCsvText = (csvText: string): CsvParseResult => {
     });
   });
 
-  const duplicateTimestampCount = [...timestampCounts.values()].reduce(
-    (count, timestampCount) => count + Math.max(0, timestampCount - 1),
-    0,
-  );
+  parsedRecords.sort((left, right) => left.timestampMs - right.timestampMs);
 
-  if (duplicateTimestampCount > 0) {
+  const uniqueRecords: ParsedHvacCsvRecord[] = [];
+  const duplicateRows: number[] = [];
+  const seenTimestamps = new Set<number>();
+
+  parsedRecords.forEach((record) => {
+    if (seenTimestamps.has(record.timestampMs)) {
+      duplicateRows.push(record.sourceRow);
+      return;
+    }
+
+    seenTimestamps.add(record.timestampMs);
+    uniqueRecords.push(record);
+  });
+
+  if (duplicateRows.length > 0) {
     warnings.push({
       field: 'timestamp',
-      message: `${duplicateTimestampCount} duplicate timestamp${
-        duplicateTimestampCount === 1 ? '' : 's'
-      } detected.`,
+      message: `${duplicateRows.length} duplicate timestamp${
+        duplicateRows.length === 1 ? ' was' : 's were'
+      } ignored after sorting. Keep one row per timestamp before analysis. Rows: ${duplicateRows
+        .slice(0, 8)
+        .join(', ')}${duplicateRows.length > 8 ? ', ...' : ''}.`,
     });
   }
 
-  records.sort((left, right) => left.timestampMs - right.timestampMs);
-
-  if (records.length < 2 && parseErrors.length === 0) {
+  if (uniqueRecords.length < 2 && parseErrors.length === 0) {
     parseErrors.push({ message: 'CSV must contain at least two valid data rows.' });
+  }
+
+  const observedIntervalsMs = uniqueRecords
+    .slice(0, -1)
+    .map((record, index) => uniqueRecords[index + 1].timestampMs - record.timestampMs);
+
+  const invalidIntervalIndex = observedIntervalsMs.findIndex((intervalMs) => intervalMs <= 0);
+
+  if (invalidIntervalIndex >= 0 && parseErrors.length === 0) {
+    parseErrors.push({
+      row: uniqueRecords[invalidIntervalIndex + 1]?.sourceRow,
+      field: 'timestamp',
+      message: 'Timestamps must increase after duplicate rows are removed.',
+    });
+  }
+
+  const typicalIntervalMs =
+    observedIntervalsMs.length > 0 && invalidIntervalIndex < 0
+      ? getMedianIntervalMs(observedIntervalsMs)
+      : 0;
+
+  if (typicalIntervalMs <= 0 && parseErrors.length === 0) {
+    parseErrors.push({
+      field: 'timestamp',
+      message: 'Unable to calculate a positive measurement interval from timestamps.',
+    });
+  }
+
+  if (typicalIntervalMs > 0) {
+    const irregularIntervals = observedIntervalsMs.filter(
+      (intervalMs) =>
+        Math.abs(intervalMs - typicalIntervalMs) / typicalIntervalMs > intervalVarianceTolerance,
+    );
+
+    if (irregularIntervals.length > 0) {
+      warnings.push({
+        field: 'timestamp',
+        message: `${irregularIntervals.length} irregular interval${
+          irregularIntervals.length === 1 ? '' : 's'
+        } detected. Typical interval is ${formatDuration(typicalIntervalMs)}; analytics will use each actual interval duration.`,
+      });
+    }
+  }
+
+  const records: HvacCsvRecord[] =
+    parseErrors.length === 0 && typicalIntervalMs > 0
+      ? uniqueRecords.map((record, index) => {
+          const nextRecord = uniqueRecords[index + 1];
+          const intervalMs = nextRecord
+            ? nextRecord.timestampMs - record.timestampMs
+            : typicalIntervalMs;
+          const intervalEndMs = record.timestampMs + intervalMs;
+          const intervalHours = intervalMs / 3600000;
+
+          return {
+            ...record,
+            intervalEnd: new Date(intervalEndMs),
+            intervalEndMs,
+            intervalMs,
+            intervalHours,
+            intervalSource: nextRecord ? 'next-record' : 'typical-final-record',
+            hvacKwh: record.hvacKw * intervalHours,
+          };
+        })
+      : [];
+
+  if (records.length > 0) {
+    const datasetDurationHours =
+      (records[records.length - 1].intervalEndMs - records[0].timestampMs) / 3600000;
+
+    if (datasetDurationHours < minimumDatasetHours && parseErrors.length === 0) {
+      parseErrors.push({
+        field: 'timestamp',
+        message: `CSV must contain at least ${minimumDatasetHours} hours of valid observations. Current dataset covers ${Number(
+          datasetDurationHours.toFixed(2),
+        )} hours.`,
+      });
+    }
   }
 
   return {
