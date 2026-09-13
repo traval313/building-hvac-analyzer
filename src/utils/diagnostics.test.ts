@@ -216,6 +216,47 @@ describe('analyzeStartupShutdown', () => {
     expect(diagnostic.postOccupancySeverity).toBe('Moderate');
   });
 
+  it('uses each calendar day maximum to determine significant HVAC activity', () => {
+    const summary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 10),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 9,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 1, 11),
+          intervalHours: 8,
+          occupied: true,
+          hvacKw: 100,
+        }),
+        makeRecord({
+          sourceRow: 4,
+          timestampMs: Date.UTC(2026, 0, 2, 10),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 9,
+        }),
+        makeRecord({
+          sourceRow: 5,
+          timestampMs: Date.UTC(2026, 0, 2, 11),
+          intervalHours: 8,
+          occupied: true,
+          hvacKw: 80,
+        }),
+      ],
+      0.2,
+    );
+
+    const diagnostic = analyzeStartupShutdown(summary);
+
+    expect(diagnostic.analyzedDayCount).toBe(2);
+    expect(diagnostic.averagePreOccupancyRuntimeHours).toBe(0.5);
+  });
+
   it('handles days without occupancy and zero-demand occupied days safely', () => {
     const summary = calculateHvacEnergySummary(
       [

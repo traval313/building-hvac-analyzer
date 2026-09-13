@@ -4,6 +4,7 @@ import CsvUpload from './components/CsvUpload';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
 import { analyzeStartupShutdown, analyzeUnoccupiedEnergy } from './utils/diagnostics';
+import { HVAC_ACTIVITY_THRESHOLD } from './utils/hvacActivity';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
 
 const formatEnergy = (kwh: number) =>
@@ -230,8 +231,9 @@ function App() {
                 </div>
               </div>
               <p className="diagnostic-note">
-                Significant HVAC activity is demand at or above 10% of each day&apos;s maximum HVAC
-                demand. Post-occupancy runtime is prioritized using the MVP review thresholds.
+                Significant HVAC activity is demand at or above {HVAC_ACTIVITY_THRESHOLD * 100}% of
+                each day&apos;s maximum HVAC demand. Post-occupancy runtime is prioritized using the
+                MVP review thresholds.
               </p>
             </article>
           </div>
