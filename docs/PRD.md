@@ -464,6 +464,12 @@ Summarize whether the analysis indicates:
 
 The overall classification should derive transparently from the four diagnostic severities. The exact aggregation rule must be documented and tested before implementation.
 
+Aggregation rule:
+
+- Any High diagnostic: Priority review suggested
+- No High diagnostics, but at least one Moderate diagnostic: Review suggested
+- All available diagnostics are Low: Low concern
+
 ### Diagnostic Cards
 
 Display one card for each diagnostic. Each card should contain:

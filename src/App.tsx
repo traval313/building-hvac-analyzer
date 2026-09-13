@@ -11,6 +11,10 @@ import {
 } from './utils/diagnostics';
 import { HVAC_ACTIVITY_THRESHOLD } from './utils/hvacActivity';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
+import {
+  classifyOverallReview,
+  OVERALL_CLASSIFICATION_CONTENT,
+} from './utils/overallClassification';
 import { getDiagnosticRecommendations } from './utils/recommendationEngine';
 import { Severity } from './utils/severityClassification';
 
@@ -77,6 +81,21 @@ function App() {
           unoccupiedLoadRatio: unoccupiedLoadRatioDiagnostic,
         })
       : [];
+  const overallClassification =
+    unoccupiedEnergyDiagnostic &&
+    startupShutdownDiagnostic &&
+    closedDayActivityDiagnostic &&
+    unoccupiedLoadRatioDiagnostic
+      ? classifyOverallReview([
+          unoccupiedEnergyDiagnostic.severity,
+          startupShutdownDiagnostic.postOccupancySeverity,
+          closedDayActivityDiagnostic.severity,
+          unoccupiedLoadRatioDiagnostic.severity,
+        ])
+      : null;
+  const overallClassificationContent = overallClassification
+    ? OVERALL_CLASSIFICATION_CONTENT[overallClassification]
+    : null;
 
   useEffect(() => {
     if (!energySummary || !shouldScrollToSummary) {
@@ -205,6 +224,13 @@ function App() {
             <span>04</span>
             <h2 id="diagnostics-title">Diagnostics</h2>
           </div>
+          {overallClassification && overallClassificationContent && (
+            <div className={`overall-finding overall-finding-${overallClassification}`}>
+              <p className="summary-label">Overall review classification</p>
+              <h3>{overallClassificationContent.label}</h3>
+              <p>{overallClassificationContent.description}</p>
+            </div>
+          )}
           <div className="diagnostic-grid">
             <article className="diagnostic-card">
               <div className="diagnostic-title-row">
