@@ -11,6 +11,7 @@ import {
 } from './utils/diagnostics';
 import { HVAC_ACTIVITY_THRESHOLD } from './utils/hvacActivity';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
+import { Severity } from './utils/severityClassification';
 
 const formatEnergy = (kwh: number) =>
   `${Math.round(kwh).toLocaleString()} kWh`;
@@ -36,6 +37,9 @@ const formatDemand = (kw: number) =>
   `${kw.toLocaleString(undefined, {
     maximumFractionDigits: 1,
   })} kW`;
+
+const formatSeverity = (severity: Severity) =>
+  severity.charAt(0).toUpperCase() + severity.slice(1);
 
 function App() {
   const summaryRef = useRef<HTMLElement>(null);
@@ -190,9 +194,15 @@ function App() {
           </div>
           <div className="diagnostic-grid">
             <article className="diagnostic-card">
-              <div>
-                <p className="summary-label">Diagnostic 1</p>
-                <h3>Unoccupied HVAC Energy</h3>
+              <div className="diagnostic-title-row">
+                <div>
+                  <p className="summary-label">Diagnostic 1</p>
+                  <h3>Unoccupied HVAC Energy</h3>
+                </div>
+                <span className={`severity severity-${unoccupiedEnergyDiagnostic.severity}`}>
+                  Classification:{' '}
+                  <strong>{formatSeverity(unoccupiedEnergyDiagnostic.severity)}</strong>
+                </span>
               </div>
               <div className="metric-grid compact">
                 <div className="metric">
@@ -226,10 +236,10 @@ function App() {
                   <h3>Startup &amp; Shutdown</h3>
                 </div>
                 <span
-                  className={`severity severity-${startupShutdownDiagnostic.postOccupancySeverity.toLowerCase()}`}
+                  className={`severity severity-${startupShutdownDiagnostic.postOccupancySeverity}`}
                 >
                   Classification:{' '}
-                  <strong>{startupShutdownDiagnostic.postOccupancySeverity}</strong>
+                  <strong>{formatSeverity(startupShutdownDiagnostic.postOccupancySeverity)}</strong>
                 </span>
               </div>
               <div className="metric-grid compact">
@@ -264,9 +274,10 @@ function App() {
                   <h3>Closed-Day Activity</h3>
                 </div>
                 <span
-                  className={`severity severity-${closedDayActivityDiagnostic.severity.toLowerCase()}`}
+                  className={`severity severity-${closedDayActivityDiagnostic.severity}`}
                 >
-                  Classification: <strong>{closedDayActivityDiagnostic.severity}</strong>
+                  Classification:{' '}
+                  <strong>{formatSeverity(closedDayActivityDiagnostic.severity)}</strong>
                 </span>
               </div>
               <div className="metric-grid compact">
@@ -304,9 +315,10 @@ function App() {
                   <h3>Unoccupied Load Ratio</h3>
                 </div>
                 <span
-                  className={`severity severity-${unoccupiedLoadRatioDiagnostic.severity.toLowerCase()}`}
+                  className={`severity severity-${unoccupiedLoadRatioDiagnostic.severity}`}
                 >
-                  Classification: <strong>{unoccupiedLoadRatioDiagnostic.severity}</strong>
+                  Classification:{' '}
+                  <strong>{formatSeverity(unoccupiedLoadRatioDiagnostic.severity)}</strong>
                 </span>
               </div>
               <div className="metric-grid compact">

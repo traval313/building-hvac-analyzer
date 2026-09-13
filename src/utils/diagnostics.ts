@@ -3,35 +3,26 @@ import {
   calculateDailyHvacActivityThreshold,
   isSignificantHvacActivity,
 } from './hvacActivity';
+import {
+  classifyClosedDayEnergyShare,
+  classifyPostOccupancyRuntimeHours,
+  classifyUnoccupiedEnergyShare,
+  classifyUnoccupiedLoadRatio,
+  Severity,
+} from './severityClassification';
 import { OperatingDay } from '../types/buildingConfig';
-
-export type DiagnosticSeverity = 'Low' | 'Moderate' | 'High';
-
-export const MVP_SEVERITY_THRESHOLDS = {
-  closedDayEnergyShare: {
-    moderateMinimumPercent: 3,
-    highMinimumPercent: 10,
-  },
-  unoccupiedLoadRatio: {
-    moderateMinimumPercent: 20,
-    highMinimumPercent: 50,
-  },
-  postOccupancyRuntimeHours: {
-    moderateMinimumHours: 1,
-    highMinimumHours: 2,
-  },
-} as const;
 
 export type UnoccupiedEnergyDiagnosticResult = {
   unoccupiedEnergyKwh: number;
   unoccupiedEnergyShare: number;
   unoccupiedCost: number;
+  severity: Severity;
 };
 
 export type StartupShutdownDiagnosticResult = {
   averagePreOccupancyRuntimeHours: number;
   averagePostOccupancyRuntimeHours: number;
-  postOccupancySeverity: DiagnosticSeverity;
+  postOccupancySeverity: Severity;
   analyzedDayCount: number;
 };
 
@@ -39,14 +30,14 @@ export type ClosedDayActivityDiagnosticResult = {
   closedDays: OperatingDay[];
   closedDayEnergyKwh: number;
   closedDayEnergyShare: number;
-  severity: DiagnosticSeverity;
+  severity: Severity;
 };
 
 export type UnoccupiedLoadRatioDiagnosticResult = {
   averageOccupiedDemandKw: number;
   averageUnoccupiedDemandKw: number;
   unoccupiedLoadRatio: number;
-  severity: DiagnosticSeverity;
+  severity: Severity;
   occupiedRecordCount: number;
   unoccupiedRecordCount: number;
 };
@@ -94,36 +85,6 @@ const groupRecordsByLocalDay = (records: HvacEnergyInterval[]) => {
   );
 };
 
-const classifyPostOccupancyRuntime = (runtimeHours: number): DiagnosticSeverity => {
-  if (runtimeHours < MVP_SEVERITY_THRESHOLDS.postOccupancyRuntimeHours.moderateMinimumHours) {
-    return 'Low';
-  }
-
-  if (runtimeHours <= MVP_SEVERITY_THRESHOLDS.postOccupancyRuntimeHours.highMinimumHours) {
-    return 'Moderate';
-  }
-
-  return 'High';
-};
-
-const classifyPercentSeverity = (
-  percent: number,
-  thresholds: {
-    moderateMinimumPercent: number;
-    highMinimumPercent: number;
-  },
-): DiagnosticSeverity => {
-  if (percent < thresholds.moderateMinimumPercent) {
-    return 'Low';
-  }
-
-  if (percent <= thresholds.highMinimumPercent) {
-    return 'Moderate';
-  }
-
-  return 'High';
-};
-
 const getLocalWeekday = (timestamp: Date): OperatingDay => weekdayNames[timestamp.getDay()];
 
 const averageDemand = (records: HvacEnergyInterval[]) =>
@@ -133,14 +94,19 @@ const averageDemand = (records: HvacEnergyInterval[]) =>
 
 export const analyzeUnoccupiedEnergy = (
   energySummary: HvacEnergySummary,
-): UnoccupiedEnergyDiagnosticResult => ({
-  unoccupiedEnergyKwh: energySummary.unoccupiedHvacEnergyKwh,
-  unoccupiedEnergyShare: safeShare(
+): UnoccupiedEnergyDiagnosticResult => {
+  const unoccupiedEnergyShare = safeShare(
     energySummary.unoccupiedHvacEnergyKwh,
     energySummary.totalHvacEnergyKwh,
-  ),
-  unoccupiedCost: energySummary.unoccupiedElectricityCost,
-});
+  );
+
+  return {
+    unoccupiedEnergyKwh: energySummary.unoccupiedHvacEnergyKwh,
+    unoccupiedEnergyShare,
+    unoccupiedCost: energySummary.unoccupiedElectricityCost,
+    severity: classifyUnoccupiedEnergyShare(unoccupiedEnergyShare),
+  };
+};
 
 export const analyzeClosedDayActivity = (
   energySummary: HvacEnergySummary,
@@ -161,10 +127,7 @@ export const analyzeClosedDayActivity = (
     closedDays,
     closedDayEnergyKwh,
     closedDayEnergyShare,
-    severity: classifyPercentSeverity(
-      closedDayEnergyShare,
-      MVP_SEVERITY_THRESHOLDS.closedDayEnergyShare,
-    ),
+    severity: classifyClosedDayEnergyShare(closedDayEnergyShare),
   };
 };
 
@@ -184,10 +147,7 @@ export const analyzeUnoccupiedLoadRatio = (
     averageOccupiedDemandKw,
     averageUnoccupiedDemandKw,
     unoccupiedLoadRatio,
-    severity: classifyPercentSeverity(
-      unoccupiedLoadRatio,
-      MVP_SEVERITY_THRESHOLDS.unoccupiedLoadRatio,
-    ),
+    severity: classifyUnoccupiedLoadRatio(unoccupiedLoadRatio),
     occupiedRecordCount: occupiedRecords.length,
     unoccupiedRecordCount: unoccupiedRecords.length,
   };
@@ -254,7 +214,7 @@ export const analyzeStartupShutdown = (
   return {
     averagePreOccupancyRuntimeHours,
     averagePostOccupancyRuntimeHours,
-    postOccupancySeverity: classifyPostOccupancyRuntime(averagePostOccupancyRuntimeHours),
+    postOccupancySeverity: classifyPostOccupancyRuntimeHours(averagePostOccupancyRuntimeHours),
     analyzedDayCount,
   };
 };

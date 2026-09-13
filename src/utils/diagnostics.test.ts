@@ -73,6 +73,7 @@ describe('analyzeUnoccupiedEnergy', () => {
     expect(diagnostic.unoccupiedEnergyKwh).toBe(10);
     expect(diagnostic.unoccupiedEnergyShare).toBeCloseTo((10 / 53) * 100);
     expect(diagnostic.unoccupiedCost).toBe(2);
+    expect(diagnostic.severity).toBe('high');
     expect(summary.occupiedHvacEnergyKwh + diagnostic.unoccupiedEnergyKwh).toBeCloseTo(
       summary.totalHvacEnergyKwh,
     );
@@ -104,6 +105,7 @@ describe('analyzeUnoccupiedEnergy', () => {
     expect(diagnostic.unoccupiedEnergyKwh).toBe(0);
     expect(diagnostic.unoccupiedEnergyShare).toBe(0);
     expect(diagnostic.unoccupiedCost).toBe(0);
+    expect(diagnostic.severity).toBe('low');
     expect(Number.isFinite(diagnostic.unoccupiedEnergyShare)).toBe(true);
   });
 
@@ -138,7 +140,9 @@ describe('analyzeUnoccupiedEnergy', () => {
     );
 
     expect(fullyOccupied.unoccupiedEnergyShare).toBe(0);
+    expect(fullyOccupied.severity).toBe('low');
     expect(fullyUnoccupied.unoccupiedEnergyShare).toBe(100);
+    expect(fullyUnoccupied.severity).toBe('high');
   });
 });
 
@@ -182,7 +186,7 @@ describe('analyzeClosedDayActivity', () => {
     expect(diagnostic.closedDays).toEqual(['Sunday', 'Saturday']);
     expect(diagnostic.closedDayEnergyKwh).toBe(25);
     expect(diagnostic.closedDayEnergyShare).toBe(25);
-    expect(diagnostic.severity).toBe('High');
+    expect(diagnostic.severity).toBe('high');
   });
 
   it('classifies closed-day energy share using MVP thresholds', () => {
@@ -225,8 +229,8 @@ describe('analyzeClosedDayActivity', () => {
       0.2,
     );
 
-    expect(analyzeClosedDayActivity(moderateSummary, ['Monday']).severity).toBe('Moderate');
-    expect(analyzeClosedDayActivity(highSummary, ['Monday']).severity).toBe('High');
+    expect(analyzeClosedDayActivity(moderateSummary, ['Monday']).severity).toBe('moderate');
+    expect(analyzeClosedDayActivity(highSummary, ['Monday']).severity).toBe('high');
   });
 
   it('handles zero total HVAC energy safely', () => {
@@ -247,7 +251,7 @@ describe('analyzeClosedDayActivity', () => {
 
     expect(diagnostic.closedDayEnergyKwh).toBe(0);
     expect(diagnostic.closedDayEnergyShare).toBe(0);
-    expect(diagnostic.severity).toBe('Low');
+    expect(diagnostic.severity).toBe('low');
     expect(Number.isFinite(diagnostic.closedDayEnergyShare)).toBe(true);
   });
 });
@@ -293,7 +297,7 @@ describe('analyzeUnoccupiedLoadRatio', () => {
     expect(diagnostic.averageOccupiedDemandKw).toBe(50);
     expect(diagnostic.averageUnoccupiedDemandKw).toBe(25);
     expect(diagnostic.unoccupiedLoadRatio).toBe(50);
-    expect(diagnostic.severity).toBe('Moderate');
+    expect(diagnostic.severity).toBe('moderate');
     expect(diagnostic.occupiedRecordCount).toBe(2);
     expect(diagnostic.unoccupiedRecordCount).toBe(2);
   });
@@ -338,8 +342,8 @@ describe('analyzeUnoccupiedLoadRatio', () => {
       0.2,
     );
 
-    expect(analyzeUnoccupiedLoadRatio(lowSummary).severity).toBe('Low');
-    expect(analyzeUnoccupiedLoadRatio(highSummary).severity).toBe('High');
+    expect(analyzeUnoccupiedLoadRatio(lowSummary).severity).toBe('low');
+    expect(analyzeUnoccupiedLoadRatio(highSummary).severity).toBe('high');
   });
 
   it('handles missing and zero occupied demand without returning NaN or Infinity', () => {
@@ -462,7 +466,7 @@ describe('analyzeStartupShutdown', () => {
     expect(diagnostic.analyzedDayCount).toBe(2);
     expect(diagnostic.averagePreOccupancyRuntimeHours).toBe(1.5);
     expect(diagnostic.averagePostOccupancyRuntimeHours).toBe(2);
-    expect(diagnostic.postOccupancySeverity).toBe('Moderate');
+    expect(diagnostic.postOccupancySeverity).toBe('moderate');
   });
 
   it('uses each calendar day maximum to determine significant HVAC activity', () => {
@@ -532,7 +536,7 @@ describe('analyzeStartupShutdown', () => {
     expect(diagnostic.analyzedDayCount).toBe(0);
     expect(diagnostic.averagePreOccupancyRuntimeHours).toBe(0);
     expect(diagnostic.averagePostOccupancyRuntimeHours).toBe(0);
-    expect(diagnostic.postOccupancySeverity).toBe('Low');
+    expect(diagnostic.postOccupancySeverity).toBe('low');
   });
 
   it('classifies average post-occupancy runtime using MVP thresholds', () => {
@@ -556,6 +560,6 @@ describe('analyzeStartupShutdown', () => {
       0.2,
     );
 
-    expect(analyzeStartupShutdown(summary).postOccupancySeverity).toBe('High');
+    expect(analyzeStartupShutdown(summary).postOccupancySeverity).toBe('high');
   });
 });
