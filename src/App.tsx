@@ -11,6 +11,7 @@ import {
 } from './utils/diagnostics';
 import { HVAC_ACTIVITY_THRESHOLD } from './utils/hvacActivity';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
+import { getDiagnosticRecommendations } from './utils/recommendationEngine';
 import { Severity } from './utils/severityClassification';
 
 const formatEnergy = (kwh: number) =>
@@ -64,6 +65,18 @@ function App() {
   const unoccupiedLoadRatioDiagnostic = energySummary
     ? analyzeUnoccupiedLoadRatio(energySummary)
     : null;
+  const recommendations =
+    unoccupiedEnergyDiagnostic &&
+    startupShutdownDiagnostic &&
+    closedDayActivityDiagnostic &&
+    unoccupiedLoadRatioDiagnostic
+      ? getDiagnosticRecommendations({
+          unoccupiedEnergy: unoccupiedEnergyDiagnostic,
+          startupShutdown: startupShutdownDiagnostic,
+          closedDayActivity: closedDayActivityDiagnostic,
+          unoccupiedLoadRatio: unoccupiedLoadRatioDiagnostic,
+        })
+      : [];
 
   useEffect(() => {
     if (!energySummary || !shouldScrollToSummary) {
@@ -346,6 +359,36 @@ function App() {
                 average original hvac_kw demand during occupied periods.
               </p>
             </article>
+          </div>
+        </section>
+      )}
+
+      {recommendations.length > 0 && (
+        <section className="panel analysis-panel" aria-labelledby="recommendations-title">
+          <div className="panel-heading">
+            <span>05</span>
+            <h2 id="recommendations-title">Recommended Actions</h2>
+          </div>
+          <div className="recommendation-list">
+            {recommendations.map((recommendation) => (
+              <article
+                className="recommendation-card"
+                key={recommendation.id}
+              >
+                <div className="recommendation-title-row">
+                  <div>
+                    <p className="summary-label">
+                      Diagnostic {recommendation.diagnosticNumber} - {recommendation.diagnosticName}
+                    </p>
+                    <h3>{recommendation.title}</h3>
+                  </div>
+                  <span className={`severity severity-${recommendation.severity}`}>
+                    Priority: <strong>{formatSeverity(recommendation.severity)}</strong>
+                  </span>
+                </div>
+                <p>{recommendation.description}</p>
+              </article>
+            ))}
           </div>
         </section>
       )}
