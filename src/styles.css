@@ -471,6 +471,40 @@ h1 {
   gap: 18px;
 }
 
+.overall-finding {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid #dce4d8;
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.overall-finding h3 {
+  margin: 0;
+  color: #231238;
+  font-size: 1.15rem;
+}
+
+.overall-finding p:last-child {
+  margin: 0;
+  color: #4d5b54;
+}
+
+.overall-finding-low-concern {
+  border-left-color: #3b8f6d;
+}
+
+.overall-finding-review-suggested {
+  border-left-color: #bf8a1b;
+}
+
+.overall-finding-priority-review-suggested {
+  border-left-color: #c94a3f;
+}
+
 .diagnostic-card {
   display: grid;
   gap: 16px;
