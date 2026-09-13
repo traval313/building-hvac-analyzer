@@ -3,7 +3,12 @@ import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
-import { analyzeStartupShutdown, analyzeUnoccupiedEnergy } from './utils/diagnostics';
+import {
+  analyzeClosedDayActivity,
+  analyzeStartupShutdown,
+  analyzeUnoccupiedEnergy,
+  analyzeUnoccupiedLoadRatio,
+} from './utils/diagnostics';
 import { HVAC_ACTIVITY_THRESHOLD } from './utils/hvacActivity';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
 
@@ -27,6 +32,11 @@ const formatHours = (hours: number) =>
     maximumFractionDigits: 1,
   })} hr`;
 
+const formatDemand = (kw: number) =>
+  `${kw.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })} kW`;
+
 function App() {
   const summaryRef = useRef<HTMLElement>(null);
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
@@ -42,6 +52,13 @@ function App() {
     : null;
   const startupShutdownDiagnostic = energySummary
     ? analyzeStartupShutdown(energySummary)
+    : null;
+  const closedDayActivityDiagnostic =
+    energySummary && buildingConfig
+      ? analyzeClosedDayActivity(energySummary, buildingConfig.normalOperatingDays)
+      : null;
+  const unoccupiedLoadRatioDiagnostic = energySummary
+    ? analyzeUnoccupiedLoadRatio(energySummary)
     : null;
 
   useEffect(() => {
@@ -162,7 +179,10 @@ function App() {
         </section>
       )}
 
-      {unoccupiedEnergyDiagnostic && startupShutdownDiagnostic && (
+      {unoccupiedEnergyDiagnostic &&
+        startupShutdownDiagnostic &&
+        closedDayActivityDiagnostic &&
+        unoccupiedLoadRatioDiagnostic && (
         <section className="panel analysis-panel" aria-labelledby="diagnostics-title">
           <div className="panel-heading">
             <span>04</span>
@@ -234,6 +254,84 @@ function App() {
                 Significant HVAC activity is demand at or above {HVAC_ACTIVITY_THRESHOLD * 100}% of
                 each day&apos;s maximum HVAC demand. Post-occupancy runtime is prioritized using the
                 MVP review thresholds.
+              </p>
+            </article>
+
+            <article className="diagnostic-card">
+              <div className="diagnostic-title-row">
+                <div>
+                  <p className="summary-label">Diagnostic 3</p>
+                  <h3>Closed-Day Activity</h3>
+                </div>
+                <span
+                  className={`severity severity-${closedDayActivityDiagnostic.severity.toLowerCase()}`}
+                >
+                  Classification: <strong>{closedDayActivityDiagnostic.severity}</strong>
+                </span>
+              </div>
+              <div className="metric-grid compact">
+                <div className="metric">
+                  <p className="summary-label">Closed-Day Energy</p>
+                  <strong>
+                    {formatEnergy(closedDayActivityDiagnostic.closedDayEnergyKwh)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Energy Share</p>
+                  <strong>
+                    {formatPercent(closedDayActivityDiagnostic.closedDayEnergyShare)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Configured Closed Days</p>
+                  <strong>
+                    {closedDayActivityDiagnostic.closedDays.length > 0
+                      ? closedDayActivityDiagnostic.closedDays.join(', ')
+                      : 'None'}
+                  </strong>
+                </div>
+              </div>
+              <p className="diagnostic-note">
+                This uses the configured normal operating days to identify records that fall on
+                normally closed weekdays, then sums the existing interval HVAC energy values.
+              </p>
+            </article>
+
+            <article className="diagnostic-card">
+              <div className="diagnostic-title-row">
+                <div>
+                  <p className="summary-label">Diagnostic 4</p>
+                  <h3>Unoccupied Load Ratio</h3>
+                </div>
+                <span
+                  className={`severity severity-${unoccupiedLoadRatioDiagnostic.severity.toLowerCase()}`}
+                >
+                  Classification: <strong>{unoccupiedLoadRatioDiagnostic.severity}</strong>
+                </span>
+              </div>
+              <div className="metric-grid compact">
+                <div className="metric">
+                  <p className="summary-label">Avg Occupied Demand</p>
+                  <strong>
+                    {formatDemand(unoccupiedLoadRatioDiagnostic.averageOccupiedDemandKw)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Avg Unoccupied Demand</p>
+                  <strong>
+                    {formatDemand(unoccupiedLoadRatioDiagnostic.averageUnoccupiedDemandKw)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Load Ratio</p>
+                  <strong>
+                    {formatPercent(unoccupiedLoadRatioDiagnostic.unoccupiedLoadRatio)}
+                  </strong>
+                </div>
+              </div>
+              <p className="diagnostic-note">
+                This compares average original hvac_kw demand during unoccupied periods against
+                average original hvac_kw demand during occupied periods.
               </p>
             </article>
           </div>

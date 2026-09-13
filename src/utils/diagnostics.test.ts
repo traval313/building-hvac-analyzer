@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { HvacCsvRecord } from '../types/csvUpload';
 import { calculateHvacEnergySummary } from './hvacEnergy';
-import { analyzeStartupShutdown, analyzeUnoccupiedEnergy } from './diagnostics';
+import {
+  analyzeClosedDayActivity,
+  analyzeStartupShutdown,
+  analyzeUnoccupiedEnergy,
+  analyzeUnoccupiedLoadRatio,
+} from './diagnostics';
 
 const makeRecord = ({
   sourceRow,
@@ -134,6 +139,250 @@ describe('analyzeUnoccupiedEnergy', () => {
 
     expect(fullyOccupied.unoccupiedEnergyShare).toBe(0);
     expect(fullyUnoccupied.unoccupiedEnergyShare).toBe(100);
+  });
+});
+
+describe('analyzeClosedDayActivity', () => {
+  it('sums interval energy on configured closed days and calculates share', () => {
+    const summary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 3, 20),
+          intervalHours: 2,
+          occupied: false,
+          hvacKw: 10,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 4, 20),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 5,
+        }),
+        makeRecord({
+          sourceRow: 4,
+          timestampMs: Date.UTC(2026, 0, 5, 20),
+          intervalHours: 3,
+          occupied: true,
+          hvacKw: 25,
+        }),
+      ],
+      0.2,
+    );
+
+    const diagnostic = analyzeClosedDayActivity(summary, [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+    ]);
+
+    expect(diagnostic.closedDays).toEqual(['Sunday', 'Saturday']);
+    expect(diagnostic.closedDayEnergyKwh).toBe(25);
+    expect(diagnostic.closedDayEnergyShare).toBe(25);
+    expect(diagnostic.severity).toBe('High');
+  });
+
+  it('classifies closed-day energy share using MVP thresholds', () => {
+    const moderateSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 3, 20),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 3,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 5, 20),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 97,
+        }),
+      ],
+      0.2,
+    );
+    const highSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 3, 20),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 11,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 5, 20),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 89,
+        }),
+      ],
+      0.2,
+    );
+
+    expect(analyzeClosedDayActivity(moderateSummary, ['Monday']).severity).toBe('Moderate');
+    expect(analyzeClosedDayActivity(highSummary, ['Monday']).severity).toBe('High');
+  });
+
+  it('handles zero total HVAC energy safely', () => {
+    const summary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 3, 20),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 0,
+        }),
+      ],
+      0.2,
+    );
+
+    const diagnostic = analyzeClosedDayActivity(summary, ['Monday']);
+
+    expect(diagnostic.closedDayEnergyKwh).toBe(0);
+    expect(diagnostic.closedDayEnergyShare).toBe(0);
+    expect(diagnostic.severity).toBe('Low');
+    expect(Number.isFinite(diagnostic.closedDayEnergyShare)).toBe(true);
+  });
+});
+
+describe('analyzeUnoccupiedLoadRatio', () => {
+  it('compares average unoccupied demand to average occupied demand', () => {
+    const summary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 8),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 40,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 1, 9),
+          intervalHours: 3,
+          occupied: true,
+          hvacKw: 60,
+        }),
+        makeRecord({
+          sourceRow: 4,
+          timestampMs: Date.UTC(2026, 0, 1, 12),
+          intervalHours: 0.5,
+          occupied: false,
+          hvacKw: 20,
+        }),
+        makeRecord({
+          sourceRow: 5,
+          timestampMs: Date.UTC(2026, 0, 1, 12, 30),
+          intervalHours: 0.5,
+          occupied: false,
+          hvacKw: 30,
+        }),
+      ],
+      0.2,
+    );
+
+    const diagnostic = analyzeUnoccupiedLoadRatio(summary);
+
+    expect(diagnostic.averageOccupiedDemandKw).toBe(50);
+    expect(diagnostic.averageUnoccupiedDemandKw).toBe(25);
+    expect(diagnostic.unoccupiedLoadRatio).toBe(50);
+    expect(diagnostic.severity).toBe('Moderate');
+    expect(diagnostic.occupiedRecordCount).toBe(2);
+    expect(diagnostic.unoccupiedRecordCount).toBe(2);
+  });
+
+  it('classifies unoccupied load ratio using MVP thresholds', () => {
+    const lowSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 8),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 100,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 1, 9),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 19,
+        }),
+      ],
+      0.2,
+    );
+    const highSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 8),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 100,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 1, 9),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 51,
+        }),
+      ],
+      0.2,
+    );
+
+    expect(analyzeUnoccupiedLoadRatio(lowSummary).severity).toBe('Low');
+    expect(analyzeUnoccupiedLoadRatio(highSummary).severity).toBe('High');
+  });
+
+  it('handles missing and zero occupied demand without returning NaN or Infinity', () => {
+    const noOccupiedSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 8),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 25,
+        }),
+      ],
+      0.2,
+    );
+    const zeroOccupiedSummary = calculateHvacEnergySummary(
+      [
+        makeRecord({
+          sourceRow: 2,
+          timestampMs: Date.UTC(2026, 0, 1, 8),
+          intervalHours: 1,
+          occupied: true,
+          hvacKw: 0,
+        }),
+        makeRecord({
+          sourceRow: 3,
+          timestampMs: Date.UTC(2026, 0, 1, 9),
+          intervalHours: 1,
+          occupied: false,
+          hvacKw: 25,
+        }),
+      ],
+      0.2,
+    );
+
+    expect(analyzeUnoccupiedLoadRatio(noOccupiedSummary).unoccupiedLoadRatio).toBe(0);
+    expect(analyzeUnoccupiedLoadRatio(zeroOccupiedSummary).unoccupiedLoadRatio).toBe(0);
+    expect(Number.isFinite(analyzeUnoccupiedLoadRatio(noOccupiedSummary).unoccupiedLoadRatio)).toBe(
+      true,
+    );
+    expect(Number.isFinite(analyzeUnoccupiedLoadRatio(zeroOccupiedSummary).unoccupiedLoadRatio)).toBe(
+      true,
+    );
   });
 });
 
