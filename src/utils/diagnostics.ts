@@ -1,4 +1,8 @@
 import { HvacEnergyInterval, HvacEnergySummary } from './hvacEnergy';
+import {
+  calculateDailyHvacActivityThreshold,
+  isSignificantHvacActivity,
+} from './hvacActivity';
 
 export type DiagnosticSeverity = 'Low' | 'Moderate' | 'High';
 
@@ -19,8 +23,6 @@ type DailyRecords = {
   dayKey: string;
   records: HvacEnergyInterval[];
 };
-
-const significantActivityThresholdRatio = 0.1;
 
 const safeShare = (part: number, total: number) => (total > 0 ? (part / total) * 100 : 0);
 
@@ -83,11 +85,13 @@ export const analyzeStartupShutdown = (
       return [];
     }
 
-    const maxHvacKw = Math.max(...records.map((record) => record.hvacKw));
-    const significantThresholdKw = maxHvacKw * significantActivityThresholdRatio;
-    const significantRecords = records.filter((record) => record.hvacKw >= significantThresholdKw);
+    const { dailyMaximumHvacDemandKw, dailySignificantActivityThresholdKw } =
+      calculateDailyHvacActivityThreshold(records);
+    const significantRecords = records.filter((record) =>
+      isSignificantHvacActivity(record, dailySignificantActivityThresholdKw),
+    );
 
-    if (maxHvacKw <= 0 || significantRecords.length === 0) {
+    if (dailyMaximumHvacDemandKw <= 0 || significantRecords.length === 0) {
       return [];
     }
 
