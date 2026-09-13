@@ -24,6 +24,36 @@ Configure Building -> Upload CSV -> Validate -> Analyze -> Review Findings -> Re
 Use [`sample-data/buildingpulse_test_after_hours.csv`](sample-data/buildingpulse_test_after_hours.csv)
 to test CSV upload, validation, hourly interval handling, and after-hours HVAC patterns.
 
+## Running Unit Tests
+
+Install dependencies first:
+
+```bash
+npm install
+```
+
+Run the automated unit tests:
+
+```bash
+npm test
+```
+
+The current unit tests cover core HVAC energy calculations, interval-duration handling,
+occupied/unoccupied energy totals, electricity costs, zero-demand intervals, zero
+electricity rates, and invalid interval-duration behavior.
+
+For test development, run Vitest in watch mode:
+
+```bash
+npx vitest
+```
+
+To verify the production build still compiles:
+
+```bash
+npm run build
+```
+
 ## Documentation
 
 See [`docs/PRD.md`](docs/PRD.md) for the full product requirements.
