@@ -438,6 +438,10 @@ h1 {
   gap: 14px;
 }
 
+.metric-grid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .metric {
   min-width: 0;
   padding: 16px;
@@ -462,11 +466,73 @@ h1 {
   text-transform: uppercase;
 }
 
+.diagnostic-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.diagnostic-card {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #dce4d8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.diagnostic-card h3 {
+  margin: 0;
+  color: #231238;
+  font-size: 1.05rem;
+}
+
+.diagnostic-title-row {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.diagnostic-note {
+  margin-bottom: 0;
+  color: #4d5b54;
+  font-size: 0.92rem;
+}
+
+.severity {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.severity strong {
+  font-size: 0.95rem;
+}
+
+.severity-low {
+  color: #17543f;
+  background: #dff3e9;
+}
+
+.severity-moderate {
+  color: #6d4b0d;
+  background: #fff1c7;
+}
+
+.severity-high {
+  color: #8f1f17;
+  background: #fbe1dc;
+}
+
 @media (max-width: 900px) {
   .topbar,
   .hero,
   .workspace,
-  .metric-grid {
+  .metric-grid,
+  .metric-grid.compact {
     grid-template-columns: 1fr;
   }
 
