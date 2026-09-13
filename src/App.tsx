@@ -3,6 +3,7 @@ import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
+import { analyzeStartupShutdown, analyzeUnoccupiedEnergy } from './utils/diagnostics';
 import { calculateHvacEnergySummary } from './utils/hvacEnergy';
 
 const formatEnergy = (kwh: number) =>
@@ -15,6 +16,16 @@ const formatCost = (cost: number) =>
     maximumFractionDigits: 0,
   });
 
+const formatPercent = (percent: number) =>
+  `${percent.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })}%`;
+
+const formatHours = (hours: number) =>
+  `${hours.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })} hr`;
+
 function App() {
   const summaryRef = useRef<HTMLElement>(null);
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
@@ -25,6 +36,12 @@ function App() {
     buildingConfig && csvParseResult
       ? calculateHvacEnergySummary(csvParseResult.records, buildingConfig.electricityRate)
       : null;
+  const unoccupiedEnergyDiagnostic = energySummary
+    ? analyzeUnoccupiedEnergy(energySummary)
+    : null;
+  const startupShutdownDiagnostic = energySummary
+    ? analyzeStartupShutdown(energySummary)
+    : null;
 
   useEffect(() => {
     if (!energySummary || !shouldScrollToSummary) {
@@ -140,6 +157,83 @@ function App() {
               <p className="summary-label">Electricity Cost</p>
               <strong>{formatCost(energySummary.electricityCost)}</strong>
             </div>
+          </div>
+        </section>
+      )}
+
+      {unoccupiedEnergyDiagnostic && startupShutdownDiagnostic && (
+        <section className="panel analysis-panel" aria-labelledby="diagnostics-title">
+          <div className="panel-heading">
+            <span>04</span>
+            <h2 id="diagnostics-title">Diagnostics</h2>
+          </div>
+          <div className="diagnostic-grid">
+            <article className="diagnostic-card">
+              <div>
+                <p className="summary-label">Diagnostic 1</p>
+                <h3>Unoccupied HVAC Energy</h3>
+              </div>
+              <div className="metric-grid compact">
+                <div className="metric">
+                  <p className="summary-label">Energy</p>
+                  <strong>
+                    {formatEnergy(unoccupiedEnergyDiagnostic.unoccupiedEnergyKwh)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Share</p>
+                  <strong>
+                    {formatPercent(unoccupiedEnergyDiagnostic.unoccupiedEnergyShare)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Observed Cost</p>
+                  <strong>{formatCost(unoccupiedEnergyDiagnostic.unoccupiedCost)}</strong>
+                </div>
+              </div>
+              <p className="diagnostic-note">
+                This is observed HVAC energy during unoccupied periods and may include required
+                operation for preconditioning, ventilation, humidity control, maintenance, or other
+                building needs.
+              </p>
+            </article>
+
+            <article className="diagnostic-card">
+              <div className="diagnostic-title-row">
+                <div>
+                  <p className="summary-label">Diagnostic 2</p>
+                  <h3>Startup &amp; Shutdown</h3>
+                </div>
+                <span
+                  className={`severity severity-${startupShutdownDiagnostic.postOccupancySeverity.toLowerCase()}`}
+                >
+                  Classification:{' '}
+                  <strong>{startupShutdownDiagnostic.postOccupancySeverity}</strong>
+                </span>
+              </div>
+              <div className="metric-grid compact">
+                <div className="metric">
+                  <p className="summary-label">Avg Pre-Occupancy</p>
+                  <strong>
+                    {formatHours(startupShutdownDiagnostic.averagePreOccupancyRuntimeHours)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Avg Post-Occupancy</p>
+                  <strong>
+                    {formatHours(startupShutdownDiagnostic.averagePostOccupancyRuntimeHours)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Analyzed Days</p>
+                  <strong>{startupShutdownDiagnostic.analyzedDayCount}</strong>
+                </div>
+              </div>
+              <p className="diagnostic-note">
+                Significant HVAC activity is demand at or above 10% of each day&apos;s maximum HVAC
+                demand. Post-occupancy runtime is prioritized using the MVP review thresholds.
+              </p>
+            </article>
           </div>
         </section>
       )}
