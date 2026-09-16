@@ -466,6 +466,156 @@ h1 {
   text-transform: uppercase;
 }
 
+.energy-breakdown {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.4fr);
+  gap: 20px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 18px;
+  border: 1px solid #dce4d8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.energy-breakdown-copy h3 {
+  margin: 0 0 8px;
+  color: #231238;
+  font-size: 1.1rem;
+}
+
+.energy-breakdown-copy p:last-child {
+  margin-bottom: 0;
+  color: #4d5b54;
+  font-size: 0.92rem;
+}
+
+.energy-breakdown-chart-row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.energy-breakdown-svg {
+  display: block;
+  width: min(100%, 220px);
+  height: auto;
+}
+
+.energy-breakdown-track {
+  stroke: #edf2ea;
+}
+
+.energy-breakdown-segment {
+  transition: stroke-dasharray 180ms ease;
+}
+
+.energy-breakdown-segment-occupied {
+  stroke: url("#energy-breakdown-occupied-pattern");
+}
+
+.energy-breakdown-segment-unoccupied {
+  stroke: url("#energy-breakdown-unoccupied-pattern");
+}
+
+.energy-breakdown-center-label,
+.energy-breakdown-center-value {
+  fill: #231238;
+  font-weight: 900;
+  text-anchor: middle;
+}
+
+.energy-breakdown-center-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.energy-breakdown-center-value {
+  font-size: 1.55rem;
+}
+
+.energy-breakdown-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.energy-breakdown-list-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce4d8;
+  border-radius: 8px;
+  background: #f8faf6;
+}
+
+.energy-breakdown-list-item.total {
+  background: #ffffff;
+}
+
+.energy-breakdown-list dt {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: #29352f;
+  font-weight: 900;
+}
+
+.energy-breakdown-list dd {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  color: #607068;
+}
+
+.energy-breakdown-list strong {
+  color: #231238;
+  font-size: 1.05rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.energy-breakdown-list span {
+  font-size: 0.84rem;
+}
+
+.energy-breakdown-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 14px;
+  border: 1px solid #29352f;
+  border-radius: 3px;
+}
+
+.energy-breakdown-swatch.energy-breakdown-segment-occupied {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #24745a 0,
+      #24745a 4px,
+      #8fc4ab 4px,
+      #8fc4ab 7px
+    );
+}
+
+.energy-breakdown-swatch.energy-breakdown-segment-unoccupied {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      #5c2d91 0,
+      #5c2d91 4px,
+      #d8c4ef 4px,
+      #d8c4ef 7px
+    );
+}
+
 .time-series-chart {
   display: grid;
   gap: 14px;
@@ -766,6 +916,8 @@ h1 {
   .topbar,
   .hero,
   .workspace,
+  .energy-breakdown,
+  .energy-breakdown-chart-row,
   .metric-grid,
   .metric-grid.compact {
     grid-template-columns: 1fr;
@@ -779,6 +931,10 @@ h1 {
   .diagnostic-title-row,
   .recommendation-title-row {
     display: grid;
+  }
+
+  .energy-breakdown-svg {
+    justify-self: center;
   }
 
 }
@@ -803,5 +959,9 @@ h1 {
   .chart-tooltip {
     min-width: 170px;
     font-size: 0.8rem;
+  }
+
+  .energy-breakdown-list-item {
+    grid-template-columns: 1fr;
   }
 }
