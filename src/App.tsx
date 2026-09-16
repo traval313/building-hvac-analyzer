@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
+import EnergyBreakdownChart from './components/EnergyBreakdownChart';
 import HvacTimeSeriesChart from './components/HvacTimeSeriesChart';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
@@ -213,6 +214,14 @@ function App() {
               <strong>{formatCost(energySummary.electricityCost)}</strong>
             </div>
           </div>
+          {unoccupiedEnergyDiagnostic && (
+            <EnergyBreakdownChart
+              totalHvacEnergyKwh={energySummary.totalHvacEnergyKwh}
+              occupiedHvacEnergyKwh={energySummary.occupiedHvacEnergyKwh}
+              unoccupiedHvacEnergyKwh={energySummary.unoccupiedHvacEnergyKwh}
+              unoccupiedEnergyShare={unoccupiedEnergyDiagnostic.unoccupiedEnergyShare}
+            />
+          )}
         </section>
       )}
 
