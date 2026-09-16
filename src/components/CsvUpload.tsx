@@ -1,12 +1,16 @@
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, KeyboardEvent, useRef, useState } from 'react';
 import { CsvParseIssue, CsvParseResult, CsvUploadFile } from '../types/csvUpload';
 import { parseCsvFile } from '../utils/csvParser';
+import { SampleDataset, SampleDatasetId } from '../utils/sampleDatasets';
 
 type CsvUploadProps = {
   selectedFile: CsvUploadFile | null;
   parseResult: CsvParseResult | null;
+  sampleDatasets: SampleDataset[];
+  activeSampleId: SampleDatasetId | null;
   onFileSelect: (file: CsvUploadFile, parseResult: CsvParseResult) => void;
   onFileRemove: () => void;
+  onSampleSelect: (sample: SampleDataset) => Promise<void>;
 };
 
 const csvMimeTypes = new Set([
@@ -63,10 +67,20 @@ const getDatasetCoverageHours = (parseResult: CsvParseResult) => {
   return (lastRecord.intervalEndMs - firstRecord.timestampMs) / 3600000;
 };
 
-function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: CsvUploadProps) {
+function CsvUpload({
+  selectedFile,
+  parseResult,
+  sampleDatasets,
+  activeSampleId,
+  onFileSelect,
+  onFileRemove,
+  onSampleSelect,
+}: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [isPreparing, setIsPreparing] = useState(false);
+  const [loadingSampleId, setLoadingSampleId] = useState<SampleDatasetId | null>(null);
+  const [previewSample, setPreviewSample] = useState<SampleDataset | null>(null);
 
   const resetInput = () => {
     if (inputRef.current) {
@@ -108,6 +122,26 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
     }
   };
 
+  const handleSampleSelect = async (sample: SampleDataset) => {
+    if (isPreparing) {
+      return;
+    }
+
+    resetInput();
+    setError('');
+    setIsPreparing(true);
+    setLoadingSampleId(sample.id);
+
+    try {
+      await onSampleSelect(sample);
+    } catch {
+      setError('Unable to load this sample dataset.');
+    } finally {
+      setIsPreparing(false);
+      setLoadingSampleId(null);
+    }
+  };
+
   const handleRemove = () => {
     resetInput();
     setError('');
@@ -117,6 +151,22 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
 
   const handleReplace = () => {
     inputRef.current?.click();
+  };
+
+  const handleSampleKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    sample: SampleDataset,
+  ) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    void handleSampleSelect(sample);
   };
 
   return (
@@ -137,6 +187,87 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
         />
       </label>
 
+      <section className="sample-data-section" aria-labelledby="sample-data-title">
+        <div>
+          <p className="summary-label">Try sample data</p>
+          <h3 id="sample-data-title">Synthetic reviewer scenarios</h3>
+        </div>
+        <div className="sample-data-options">
+          {sampleDatasets.map((sample) => {
+            const isActive = activeSampleId === sample.id;
+            const isLoading = loadingSampleId === sample.id;
+
+            return (
+              <div
+                aria-disabled={isPreparing}
+                className={isActive ? 'sample-data-option active' : 'sample-data-option'}
+                key={sample.id}
+                onClick={() => void handleSampleSelect(sample)}
+                onKeyDown={(event) => handleSampleKeyDown(event, sample)}
+                role="button"
+                tabIndex={isPreparing ? -1 : 0}
+              >
+                <span>
+                  <strong>{sample.label}</strong>
+                  <small>{sample.description}</small>
+                </span>
+                <span className="sample-data-actions">
+                  <button
+                    className="sample-data-view"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPreviewSample(sample);
+                    }}
+                    type="button"
+                  >
+                    View CSV
+                  </button>
+                  {(isLoading || isActive) && (
+                    <span className="sample-data-status">
+                      {isLoading ? 'Loading...' : 'Loaded'}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {previewSample && (
+        <div
+          className="sample-preview-backdrop"
+          onClick={() => setPreviewSample(null)}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="sample-preview-title"
+            aria-modal="true"
+            className="sample-preview-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="sample-preview-header">
+              <div>
+                <p className="summary-label">Sample CSV</p>
+                <h3 id="sample-preview-title">{previewSample.fileName}</h3>
+              </div>
+              <button
+                aria-label="Close sample CSV preview"
+                className="sample-preview-close"
+                onClick={() => setPreviewSample(null)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <pre className="sample-preview-content">
+              <code>{previewSample.csvText}</code>
+            </pre>
+          </section>
+        </div>
+      )}
+
       {isPreparing && (
         <div className="upload-status" aria-live="polite" role="status">
           Parsing CSV records...
@@ -151,6 +282,14 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
 
       {selectedFile && !isPreparing && (
         <div className="file-summary" aria-live="polite">
+          {activeSampleId && (
+            <div className="demo-data-label">
+              <strong>Synthetic demo data</strong>
+              <span>
+                {sampleDatasets.find((sample) => sample.id === activeSampleId)?.label}
+              </span>
+            </div>
+          )}
           <div>
             <p className="summary-label">Selected file</p>
             <h3>{selectedFile.name}</h3>
@@ -207,7 +346,7 @@ function CsvUpload({ selectedFile, parseResult, onFileSelect, onFileRemove }: Cs
               Replace file
             </button>
             <button className="secondary-button" type="button" onClick={handleRemove}>
-              Remove
+              {activeSampleId ? 'Exit sample mode' : 'Remove'}
             </button>
           </div>
         </div>
