@@ -4,7 +4,7 @@ import CsvUpload from './components/CsvUpload';
 import EnergyBreakdownChart from './components/EnergyBreakdownChart';
 import HvacTimeSeriesChart from './components/HvacTimeSeriesChart';
 import { BuildingConfig } from './types/buildingConfig';
-import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
+import { CsvParseIssue, CsvParseResult, CsvUploadFile } from './types/csvUpload';
 import {
   analyzeClosedDayActivity,
   analyzeStartupShutdown,
@@ -50,32 +50,39 @@ const formatDemand = (kw: number) =>
 const formatSeverity = (severity: Severity) =>
   severity.charAt(0).toUpperCase() + severity.slice(1);
 
+const formatCsvIssue = (issue: CsvParseIssue) => {
+  const location = issue.row ? `Row ${issue.row}: ` : '';
+  return `${location}${issue.message}`;
+};
+
+type AnalysisResult = {
+  energySummary: ReturnType<typeof calculateHvacEnergySummary>;
+  unoccupiedEnergyDiagnostic: ReturnType<typeof analyzeUnoccupiedEnergy>;
+  startupShutdownDiagnostic: ReturnType<typeof analyzeStartupShutdown>;
+  closedDayActivityDiagnostic: ReturnType<typeof analyzeClosedDayActivity>;
+  unoccupiedLoadRatioDiagnostic: ReturnType<typeof analyzeUnoccupiedLoadRatio>;
+};
+
+type AnalysisStatus = 'waiting' | 'running' | 'complete' | 'failed';
+
 function App() {
   const summaryRef = useRef<HTMLElement>(null);
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
   const [csvFile, setCsvFile] = useState<CsvUploadFile | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<CsvParseResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('waiting');
+  const [analysisError, setAnalysisError] = useState('');
+  const [analysisAttempt, setAnalysisAttempt] = useState(0);
   const [analysisOrigin, setAnalysisOrigin] = useState<'uploaded' | 'sample' | null>(null);
   const [activeSampleId, setActiveSampleId] = useState<SampleDatasetId | null>(null);
   const [buildingConfigStatus, setBuildingConfigStatus] = useState<'saved' | 'previous'>('saved');
   const [shouldScrollToSummary, setShouldScrollToSummary] = useState(false);
-  const energySummary =
-    buildingConfig && csvParseResult
-      ? calculateHvacEnergySummary(csvParseResult.records, buildingConfig.electricityRate)
-      : null;
-  const unoccupiedEnergyDiagnostic = energySummary
-    ? analyzeUnoccupiedEnergy(energySummary)
-    : null;
-  const startupShutdownDiagnostic = energySummary
-    ? analyzeStartupShutdown(energySummary)
-    : null;
-  const closedDayActivityDiagnostic =
-    energySummary && buildingConfig
-      ? analyzeClosedDayActivity(energySummary, buildingConfig.normalOperatingDays)
-      : null;
-  const unoccupiedLoadRatioDiagnostic = energySummary
-    ? analyzeUnoccupiedLoadRatio(energySummary)
-    : null;
+  const energySummary = analysisResult?.energySummary ?? null;
+  const unoccupiedEnergyDiagnostic = analysisResult?.unoccupiedEnergyDiagnostic ?? null;
+  const startupShutdownDiagnostic = analysisResult?.startupShutdownDiagnostic ?? null;
+  const closedDayActivityDiagnostic = analysisResult?.closedDayActivityDiagnostic ?? null;
+  const unoccupiedLoadRatioDiagnostic = analysisResult?.unoccupiedLoadRatioDiagnostic ?? null;
   const recommendations =
     unoccupiedEnergyDiagnostic &&
     startupShutdownDiagnostic &&
@@ -105,7 +112,7 @@ function App() {
     : null;
 
   useEffect(() => {
-    if (!energySummary || !shouldScrollToSummary) {
+    if (analysisStatus !== 'complete' || !energySummary || !shouldScrollToSummary) {
       return;
     }
 
@@ -114,7 +121,53 @@ function App() {
       block: 'start',
     });
     setShouldScrollToSummary(false);
-  }, [energySummary, shouldScrollToSummary]);
+  }, [analysisStatus, energySummary, shouldScrollToSummary]);
+
+  useEffect(() => {
+    if (!buildingConfig || !csvParseResult) {
+      setAnalysisResult(null);
+      setAnalysisStatus('waiting');
+      setAnalysisError('');
+      return;
+    }
+
+    setAnalysisStatus('running');
+    setAnalysisError('');
+    setAnalysisResult(null);
+
+    const analysisTimer = window.setTimeout(() => {
+      try {
+        const nextEnergySummary = calculateHvacEnergySummary(
+          csvParseResult.records,
+          buildingConfig.electricityRate,
+        );
+        const nextUnoccupiedEnergyDiagnostic = analyzeUnoccupiedEnergy(nextEnergySummary);
+        const nextStartupShutdownDiagnostic = analyzeStartupShutdown(nextEnergySummary);
+        const nextClosedDayActivityDiagnostic = analyzeClosedDayActivity(
+          nextEnergySummary,
+          buildingConfig.normalOperatingDays,
+        );
+        const nextUnoccupiedLoadRatioDiagnostic = analyzeUnoccupiedLoadRatio(nextEnergySummary);
+
+        setAnalysisResult({
+          energySummary: nextEnergySummary,
+          unoccupiedEnergyDiagnostic: nextUnoccupiedEnergyDiagnostic,
+          startupShutdownDiagnostic: nextStartupShutdownDiagnostic,
+          closedDayActivityDiagnostic: nextClosedDayActivityDiagnostic,
+          unoccupiedLoadRatioDiagnostic: nextUnoccupiedLoadRatioDiagnostic,
+        });
+        setAnalysisStatus('complete');
+      } catch {
+        setAnalysisResult(null);
+        setAnalysisStatus('failed');
+        setAnalysisError(
+          'Analysis could not be completed with this setup and CSV. Check the uploaded data, then retry or reset the analysis.',
+        );
+      }
+    }, 450);
+
+    return () => window.clearTimeout(analysisTimer);
+  }, [analysisAttempt, buildingConfig, csvParseResult]);
 
   const handleCsvSelect = (file: CsvUploadFile, parseResult: CsvParseResult) => {
     setCsvFile(file);
@@ -127,6 +180,9 @@ function App() {
   const handleCsvRemove = () => {
     setCsvFile(null);
     setCsvParseResult(null);
+    setAnalysisResult(null);
+    setAnalysisStatus('waiting');
+    setAnalysisError('');
     setAnalysisOrigin(null);
     setActiveSampleId(null);
     setShouldScrollToSummary(false);
@@ -140,6 +196,20 @@ function App() {
       setShouldScrollToSummary(true);
     }
   };
+
+  const handleAnalysisRetry = () => {
+    setShouldScrollToSummary(true);
+    setAnalysisAttempt((currentAttempt) => currentAttempt + 1);
+  };
+
+  const handleAnalysisReset = () => {
+    handleCsvRemove();
+  };
+
+  const missingPrerequisites = [
+    !buildingConfig ? 'Save building setup' : null,
+    !csvParseResult ? 'Upload a valid CSV or load sample data' : null,
+  ].filter((item): item is string => Boolean(item));
 
   const handleBuildingConfigClear = () => {
     if (buildingConfig) {
@@ -236,7 +306,61 @@ function App() {
         </div>
       </section>
 
-      {energySummary && (
+      {analysisStatus !== 'complete' && (
+        <section
+          className={`panel analysis-panel analysis-state analysis-state-${analysisStatus}`}
+          aria-labelledby="analysis-state-title"
+          ref={summaryRef}
+        >
+          <div className="panel-heading">
+            <span>03</span>
+            <h2 id="analysis-state-title">Analysis Status</h2>
+          </div>
+          {analysisStatus === 'waiting' && (
+            <div className="feedback-panel neutral" role="status">
+              <p className="summary-label">Waiting for inputs</p>
+              <h3>No analysis yet</h3>
+              <p>
+                Complete the required steps below and BuildingPulse will run the HVAC review
+                automatically.
+              </p>
+              <ul className="status-checklist">
+                {missingPrerequisites.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analysisStatus === 'running' && (
+            <div className="feedback-panel active" aria-live="polite" role="status">
+              <span className="spinner" aria-hidden="true" />
+              <p className="summary-label">Analyzing data</p>
+              <h3>Reviewing HVAC patterns</h3>
+              <p>
+                Calculating energy totals, after-hours behavior, closed-day activity, and
+                recommendations.
+              </p>
+            </div>
+          )}
+          {analysisStatus === 'failed' && (
+            <div className="feedback-panel danger" role="alert">
+              <p className="summary-label">Analysis failed</p>
+              <h3>Results could not be generated</h3>
+              <p>{analysisError}</p>
+              <div className="file-actions">
+                <button type="button" onClick={handleAnalysisRetry}>
+                  Retry analysis
+                </button>
+                <button className="secondary-button" type="button" onClick={handleAnalysisReset}>
+                  Reset upload
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {analysisStatus === 'complete' && energySummary && (
         <section
           className="panel analysis-panel"
           aria-labelledby="energy-summary-title"
@@ -252,6 +376,17 @@ function App() {
               <span>
                 {sampleDatasets.find((sample) => sample.id === activeSampleId)?.label}
               </span>
+            </div>
+          )}
+          {csvParseResult && csvParseResult.warnings.length > 0 && (
+            <div className="result-warning-panel" role="status">
+              <p className="summary-label">Data quality warnings</p>
+              <h3>Analysis completed with notes</h3>
+              <ul>
+                {csvParseResult.warnings.map((warning) => (
+                  <li key={formatCsvIssue(warning)}>{formatCsvIssue(warning)}</li>
+                ))}
+              </ul>
             </div>
           )}
           <div className="metric-grid">
@@ -283,7 +418,7 @@ function App() {
         </section>
       )}
 
-      {csvParseResult && (
+      {analysisStatus === 'complete' && csvParseResult && (
         <section className="panel analysis-panel" aria-labelledby="time-series-title">
           <div className="panel-heading">
             <span>04</span>
@@ -493,6 +628,32 @@ function App() {
                 <p>{recommendation.description}</p>
               </article>
             ))}
+          </div>
+        </section>
+      )}
+
+      {analysisStatus === 'complete' &&
+        unoccupiedEnergyDiagnostic &&
+        startupShutdownDiagnostic &&
+        closedDayActivityDiagnostic &&
+        unoccupiedLoadRatioDiagnostic &&
+        recommendations.length === 0 && (
+        <section className="panel analysis-panel" aria-labelledby="recommendations-title">
+          <div className="panel-heading">
+            <span>06</span>
+            <h2 id="recommendations-title">Recommended Actions</h2>
+          </div>
+          <div className="feedback-panel success" role="status">
+            <p className="summary-label">No priority actions</p>
+            <h3>No recommendations triggered</h3>
+            <p>
+              The uploaded data did not cross the current recommendation thresholds. Keep this
+              report with the building record and rerun the review when schedules or occupancy
+              patterns change.
+            </p>
+            <button className="secondary-button" type="button" onClick={handleAnalysisRetry}>
+              Rerun analysis
+            </button>
           </div>
         </section>
       )}
