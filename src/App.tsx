@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BuildingConfigForm from './components/BuildingConfigForm';
 import CsvUpload from './components/CsvUpload';
+import HvacTimeSeriesChart from './components/HvacTimeSeriesChart';
 import { BuildingConfig } from './types/buildingConfig';
 import { CsvParseResult, CsvUploadFile } from './types/csvUpload';
 import {
@@ -215,13 +216,23 @@ function App() {
         </section>
       )}
 
+      {csvParseResult && (
+        <section className="panel analysis-panel" aria-labelledby="time-series-title">
+          <div className="panel-heading">
+            <span>04</span>
+            <h2 id="time-series-title">HVAC Demand &amp; Occupancy Timeline</h2>
+          </div>
+          <HvacTimeSeriesChart records={csvParseResult.records} />
+        </section>
+      )}
+
       {unoccupiedEnergyDiagnostic &&
         startupShutdownDiagnostic &&
         closedDayActivityDiagnostic &&
         unoccupiedLoadRatioDiagnostic && (
         <section className="panel analysis-panel" aria-labelledby="diagnostics-title">
           <div className="panel-heading">
-            <span>04</span>
+            <span>05</span>
             <h2 id="diagnostics-title">Diagnostics</h2>
           </div>
           {overallClassification && overallClassificationContent && (
@@ -392,7 +403,7 @@ function App() {
       {recommendations.length > 0 && (
         <section className="panel analysis-panel" aria-labelledby="recommendations-title">
           <div className="panel-heading">
-            <span>05</span>
+            <span>06</span>
             <h2 id="recommendations-title">Recommended Actions</h2>
           </div>
           <div className="recommendation-list">
