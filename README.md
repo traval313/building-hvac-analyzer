@@ -21,8 +21,9 @@ Configure Building -> Upload CSV -> Validate -> Analyze -> Review Findings -> Re
 
 ## Sample Data
 
-Use [`sample-data/buildingpulse_test_after_hours.csv`](sample-data/buildingpulse_test_after_hours.csv)
-to test CSV upload, validation, hourly interval handling, and after-hours HVAC patterns.
+Use the synthetic demo datasets in [`sample-data/`](sample-data/) to test CSV upload,
+validation, hourly interval handling, and predictable diagnostic patterns for efficient,
+after-hours, and weekend/closed-day HVAC operation.
 
 ## Running Unit Tests
 
