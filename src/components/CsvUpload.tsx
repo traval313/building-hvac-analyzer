@@ -77,8 +77,9 @@ function CsvUpload({
   onSampleSelect,
 }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<string[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [preparingLabel, setPreparingLabel] = useState('');
   const [loadingSampleId, setLoadingSampleId] = useState<SampleDatasetId | null>(null);
   const [previewSample, setPreviewSample] = useState<SampleDataset | null>(null);
 
@@ -90,35 +91,37 @@ function CsvUpload({
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
-    setError('');
+    setErrors([]);
 
     if (!file) {
       return;
     }
 
     if (!isCsvFile(file)) {
-      setError('Select a CSV file with a .csv extension.');
+      setErrors(['Select a CSV file with a .csv extension.']);
       resetInput();
       return;
     }
 
     setIsPreparing(true);
+    setPreparingLabel(`Validating ${file.name}`);
 
     try {
       const result = await parseCsvFile(file);
 
       if (result.errors.length > 0) {
-        setError(result.errors.map(formatIssue).join(' '));
+        setErrors(result.errors.map(formatIssue));
         resetInput();
         return;
       }
 
       onFileSelect(file, result);
     } catch {
-      setError('Unable to read this CSV file.');
+      setErrors(['Unable to read this CSV file. Try exporting a fresh CSV and upload it again.']);
       resetInput();
     } finally {
       setIsPreparing(false);
+      setPreparingLabel('');
     }
   };
 
@@ -128,24 +131,27 @@ function CsvUpload({
     }
 
     resetInput();
-    setError('');
+    setErrors([]);
     setIsPreparing(true);
+    setPreparingLabel(`Loading ${sample.label}`);
     setLoadingSampleId(sample.id);
 
     try {
       await onSampleSelect(sample);
     } catch {
-      setError('Unable to load this sample dataset.');
+      setErrors(['Unable to load this sample dataset. Try another sample or upload a CSV.']);
     } finally {
       setIsPreparing(false);
+      setPreparingLabel('');
       setLoadingSampleId(null);
     }
   };
 
   const handleRemove = () => {
     resetInput();
-    setError('');
+    setErrors([]);
     setIsPreparing(false);
+    setPreparingLabel('');
     onFileRemove();
   };
 
@@ -176,8 +182,8 @@ function CsvUpload({
         <span className="csv-picker-subtitle">CSV contents stay in this browser.</span>
         <input
           accept=".csv,text/csv"
-          aria-describedby={error ? 'csv-upload-error' : undefined}
-          aria-invalid={Boolean(error)}
+          aria-describedby={errors.length > 0 ? 'csv-upload-error' : undefined}
+          aria-invalid={errors.length > 0}
           disabled={isPreparing}
           id="csvFile"
           name="csvFile"
@@ -186,6 +192,17 @@ function CsvUpload({
           type="file"
         />
       </label>
+
+      {!selectedFile && !isPreparing && errors.length === 0 && (
+        <div className="upload-empty-state" role="status">
+          <p className="summary-label">No file loaded</p>
+          <h3>Upload data or choose a sample</h3>
+          <p>
+            Expected columns are timestamp, occupied, and hvac_kw. Optional temperature columns are
+            supported.
+          </p>
+        </div>
+      )}
 
       <section className="sample-data-section" aria-labelledby="sample-data-title">
         <div>
@@ -270,14 +287,27 @@ function CsvUpload({
 
       {isPreparing && (
         <div className="upload-status" aria-live="polite" role="status">
-          Parsing CSV records...
+          <span className="spinner small" aria-hidden="true" />
+          <span>{preparingLabel || 'Preparing CSV records'}</span>
         </div>
       )}
 
-      {error && (
-        <p className="field-error" id="csv-upload-error">
-          {error}
-        </p>
+      {errors.length > 0 && (
+        <div className="validation-panel" id="csv-upload-error" role="alert">
+          <p className="summary-label">CSV validation error</p>
+          <h3>File was not loaded</h3>
+          <ul>
+            {errors.slice(0, 6).map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+          {errors.length > 6 && (
+            <p>{errors.length - 6} more issue{errors.length - 6 === 1 ? '' : 's'} found.</p>
+          )}
+          <button className="secondary-button" type="button" onClick={handleReplace}>
+            Try another CSV
+          </button>
+        </div>
       )}
 
       {selectedFile && !isPreparing && (
