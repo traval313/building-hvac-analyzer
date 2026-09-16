@@ -18,6 +18,8 @@ import {
   OVERALL_CLASSIFICATION_CONTENT,
 } from './utils/overallClassification';
 import { getDiagnosticRecommendations } from './utils/recommendationEngine';
+import { sampleDatasets, SampleDataset, SampleDatasetId } from './utils/sampleDatasets';
+import { parseCsvText } from './utils/csvParser';
 import { Severity } from './utils/severityClassification';
 
 const formatEnergy = (kwh: number) =>
@@ -53,6 +55,9 @@ function App() {
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
   const [csvFile, setCsvFile] = useState<CsvUploadFile | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<CsvParseResult | null>(null);
+  const [analysisOrigin, setAnalysisOrigin] = useState<'uploaded' | 'sample' | null>(null);
+  const [activeSampleId, setActiveSampleId] = useState<SampleDatasetId | null>(null);
+  const [buildingConfigStatus, setBuildingConfigStatus] = useState<'saved' | 'previous'>('saved');
   const [shouldScrollToSummary, setShouldScrollToSummary] = useState(false);
   const energySummary =
     buildingConfig && csvParseResult
@@ -114,13 +119,50 @@ function App() {
   const handleCsvSelect = (file: CsvUploadFile, parseResult: CsvParseResult) => {
     setCsvFile(file);
     setCsvParseResult(parseResult);
+    setAnalysisOrigin('uploaded');
+    setActiveSampleId(null);
     setShouldScrollToSummary(true);
   };
 
   const handleCsvRemove = () => {
     setCsvFile(null);
     setCsvParseResult(null);
+    setAnalysisOrigin(null);
+    setActiveSampleId(null);
     setShouldScrollToSummary(false);
+  };
+
+  const handleBuildingConfigSubmit = (config: BuildingConfig) => {
+    setBuildingConfig(config);
+    setBuildingConfigStatus('saved');
+
+    if (csvParseResult) {
+      setShouldScrollToSummary(true);
+    }
+  };
+
+  const handleBuildingConfigClear = () => {
+    if (buildingConfig) {
+      setBuildingConfigStatus('previous');
+    }
+  };
+
+  const handleSampleSelect = async (sample: SampleDataset) => {
+    const parseResult = parseCsvText(sample.csvText);
+
+    if (parseResult.errors.length > 0) {
+      throw new Error('Sample dataset failed CSV validation.');
+    }
+
+    const file = new File([sample.csvText], sample.fileName, { type: 'text/csv' });
+
+    setBuildingConfig(sample.buildingConfig);
+    setBuildingConfigStatus('saved');
+    setCsvFile(file);
+    setCsvParseResult(parseResult);
+    setAnalysisOrigin('sample');
+    setActiveSampleId(sample.id);
+    setShouldScrollToSummary(true);
   };
 
   return (
@@ -157,11 +199,16 @@ function App() {
           </div>
           <BuildingConfigForm
             initialConfig={buildingConfig}
-            onSubmit={setBuildingConfig}
+            onClear={handleBuildingConfigClear}
+            onSubmit={handleBuildingConfigSubmit}
           />
           {buildingConfig && (
             <div className="config-summary" aria-live="polite">
-              <p className="summary-label">Saved configuration</p>
+              <p className="summary-label">
+                {buildingConfigStatus === 'previous'
+                  ? 'Previous configuration'
+                  : 'Saved configuration'}
+              </p>
               <h3>{buildingConfig.buildingName}</h3>
               <p>
                 {buildingConfig.buildingType} building, ${buildingConfig.electricityRate.toFixed(4)}
@@ -180,8 +227,11 @@ function App() {
           <CsvUpload
             selectedFile={csvFile}
             parseResult={csvParseResult}
+            sampleDatasets={sampleDatasets}
+            activeSampleId={activeSampleId}
             onFileSelect={handleCsvSelect}
             onFileRemove={handleCsvRemove}
+            onSampleSelect={handleSampleSelect}
           />
         </div>
       </section>
@@ -196,6 +246,14 @@ function App() {
             <span>03</span>
             <h2 id="energy-summary-title">HVAC Energy Summary</h2>
           </div>
+          {analysisOrigin === 'sample' && activeSampleId && (
+            <div className="demo-mode-banner" role="status">
+              <strong>Synthetic demo data</strong>
+              <span>
+                {sampleDatasets.find((sample) => sample.id === activeSampleId)?.label}
+              </span>
+            </div>
+          )}
           <div className="metric-grid">
             <div className="metric">
               <p className="summary-label">Total HVAC Energy</p>

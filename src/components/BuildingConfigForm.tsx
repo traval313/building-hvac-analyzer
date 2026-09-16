@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import {
   BuildingConfig,
   BuildingType,
@@ -19,6 +19,7 @@ type BuildingConfigFormErrors = Partial<Record<keyof BuildingConfigFormValues, s
 type BuildingConfigFormProps = {
   initialConfig?: BuildingConfig | null;
   onSubmit: (config: BuildingConfig) => void;
+  onClear: () => void;
 };
 
 const createInitialValues = (
@@ -79,11 +80,16 @@ const validateForm = (
   };
 };
 
-function BuildingConfigForm({ initialConfig, onSubmit }: BuildingConfigFormProps) {
+function BuildingConfigForm({ initialConfig, onSubmit, onClear }: BuildingConfigFormProps) {
   const [values, setValues] = useState<BuildingConfigFormValues>(() =>
     createInitialValues(initialConfig),
   );
   const [errors, setErrors] = useState<BuildingConfigFormErrors>({});
+
+  useEffect(() => {
+    setValues(createInitialValues(initialConfig));
+    setErrors({});
+  }, [initialConfig]);
 
   const fieldErrorId = (field: keyof BuildingConfigFormValues) =>
     errors[field] ? `${field}-error` : undefined;
@@ -109,6 +115,17 @@ function BuildingConfigForm({ initialConfig, onSubmit }: BuildingConfigFormProps
     if (result.config) {
       onSubmit(result.config);
     }
+  };
+
+  const handleClear = () => {
+    setValues((currentValues) => ({
+      ...currentValues,
+      buildingName: '',
+      buildingType: '',
+      electricityRate: '',
+    }));
+    setErrors({});
+    onClear();
   };
 
   return (
@@ -214,7 +231,12 @@ function BuildingConfigForm({ initialConfig, onSubmit }: BuildingConfigFormProps
         )}
       </fieldset>
 
-      <button type="submit">Save building setup</button>
+      <div className="form-actions">
+        <button type="submit">Save building setup</button>
+        <button className="secondary-button" type="button" onClick={handleClear}>
+          Clear building setup
+        </button>
+      </div>
     </form>
   );
 }
