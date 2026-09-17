@@ -47,6 +47,15 @@ const formatDemand = (kw: number) =>
     maximumFractionDigits: 1,
   })} kW`;
 
+const formatDateTime = (date: Date) =>
+  new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
 const formatSeverity = (severity: Severity) =>
   severity.charAt(0).toUpperCase() + severity.slice(1);
 
@@ -144,6 +153,13 @@ function App() {
   const overallClassificationContent = overallClassification
     ? OVERALL_CLASSIFICATION_CONTENT[overallClassification]
     : null;
+  const analysisStart = energySummary?.intervals[0]?.timestamp ?? null;
+  const analysisEnd =
+    energySummary?.intervals[energySummary.intervals.length - 1]?.intervalEnd ?? null;
+  const closedDayElectricityCost =
+    closedDayActivityDiagnostic && buildingConfig
+      ? closedDayActivityDiagnostic.closedDayEnergyKwh * buildingConfig.electricityRate
+      : 0;
 
   useEffect(() => {
     if (analysisStatus !== 'complete' || !energySummary || !shouldScrollToSummary) {
@@ -608,6 +624,35 @@ function App() {
               </ul>
             </div>
           )}
+          {buildingConfig && analysisStart && analysisEnd && (
+            <section className="building-summary" aria-labelledby="building-summary-title">
+              <div>
+                <p className="summary-label">Building summary</p>
+                <h3 id="building-summary-title">{buildingConfig.buildingName}</h3>
+                <p>{buildingConfig.buildingType} building</p>
+              </div>
+              <dl>
+                <div>
+                  <dt>Analysis date range</dt>
+                  <dd>
+                    {formatDateTime(analysisStart)} to {formatDateTime(analysisEnd)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Valid records analyzed</dt>
+                  <dd>{energySummary.intervals.length.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Electricity rate</dt>
+                  <dd>${buildingConfig.electricityRate.toFixed(4)}/kWh</dd>
+                </div>
+                <div>
+                  <dt>Configured operating days</dt>
+                  <dd>{buildingConfig.normalOperatingDays.join(', ')}</dd>
+                </div>
+              </dl>
+            </section>
+          )}
           <div className="metric-grid">
             <div className="metric">
               <p className="summary-label">Total HVAC Energy</p>
@@ -625,6 +670,20 @@ function App() {
               <p className="summary-label">Electricity Cost</p>
               <strong>{formatCost(energySummary.electricityCost)}</strong>
             </div>
+            {closedDayActivityDiagnostic && (
+              <>
+                <div className="metric">
+                  <p className="summary-label">Closed-Day HVAC Energy</p>
+                  <strong>
+                    {formatEnergy(closedDayActivityDiagnostic.closedDayEnergyKwh)}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <p className="summary-label">Closed-Day Observed Cost</p>
+                  <strong>{formatCost(closedDayElectricityCost)}</strong>
+                </div>
+              </>
+            )}
           </div>
           {unoccupiedEnergyDiagnostic && (
             <EnergyBreakdownChart
