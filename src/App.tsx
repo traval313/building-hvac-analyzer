@@ -20,7 +20,7 @@ import {
 import { getDiagnosticRecommendations } from './utils/recommendationEngine';
 import { sampleDatasets, SampleDataset, SampleDatasetId } from './utils/sampleDatasets';
 import { parseCsvText } from './utils/csvParser';
-import { Severity } from './utils/severityClassification';
+import { Severity, SEVERITY_THRESHOLDS } from './utils/severityClassification';
 
 const formatEnergy = (kwh: number) =>
   `${Math.round(kwh).toLocaleString()} kWh`;
@@ -50,6 +50,38 @@ const formatDemand = (kw: number) =>
 const formatSeverity = (severity: Severity) =>
   severity.charAt(0).toUpperCase() + severity.slice(1);
 
+const formatThreshold = (value: number, unit: '%' | 'hr') =>
+  `${value.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })}${unit === '%' ? '%' : ' hr'}`;
+
+const thresholdSummaries = [
+  {
+    name: 'Unoccupied HVAC Energy',
+    basis: 'Unoccupied HVAC energy share',
+    unit: '%' as const,
+    thresholds: SEVERITY_THRESHOLDS.unoccupiedEnergyShare,
+  },
+  {
+    name: 'Startup & Shutdown',
+    basis: 'Average post-occupancy runtime',
+    unit: 'hr' as const,
+    thresholds: SEVERITY_THRESHOLDS.postOccupancyRuntimeHours,
+  },
+  {
+    name: 'Closed-Day Activity',
+    basis: 'Closed-day HVAC energy share',
+    unit: '%' as const,
+    thresholds: SEVERITY_THRESHOLDS.closedDayEnergyShare,
+  },
+  {
+    name: 'Unoccupied Load Ratio',
+    basis: 'Average unoccupied demand / occupied demand',
+    unit: '%' as const,
+    thresholds: SEVERITY_THRESHOLDS.unoccupiedLoadRatio,
+  },
+];
+
 const formatCsvIssue = (issue: CsvParseIssue) => {
   const location = issue.row ? `Row ${issue.row}: ` : '';
   return `${location}${issue.message}`;
@@ -64,9 +96,11 @@ type AnalysisResult = {
 };
 
 type AnalysisStatus = 'waiting' | 'running' | 'complete' | 'failed';
+type AppPage = 'dashboard' | 'privacy-methodology';
 
 function App() {
   const summaryRef = useRef<HTMLElement>(null);
+  const [activePage, setActivePage] = useState<AppPage>('dashboard');
   const [buildingConfig, setBuildingConfig] = useState<BuildingConfig | null>(null);
   const [csvFile, setCsvFile] = useState<CsvUploadFile | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<CsvParseResult | null>(null);
@@ -235,6 +269,11 @@ function App() {
     setShouldScrollToSummary(true);
   };
 
+  const handlePageChange = (page: AppPage) => {
+    setActivePage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar" aria-label="Application header">
@@ -242,8 +281,188 @@ function App() {
           <p className="eyebrow">Commercial HVAC Operations Advisor</p>
           <h1>BuildingPulse</h1>
         </div>
-        <button type="button">Export report</button>
+        <nav className="topbar-nav" aria-label="Primary navigation">
+          <button
+            className={activePage === 'dashboard' ? 'nav-button active' : 'nav-button'}
+            type="button"
+            aria-current={activePage === 'dashboard' ? 'page' : undefined}
+            onClick={() => handlePageChange('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button
+            className={activePage === 'privacy-methodology' ? 'nav-button active' : 'nav-button'}
+            type="button"
+            aria-current={activePage === 'privacy-methodology' ? 'page' : undefined}
+            onClick={() => handlePageChange('privacy-methodology')}
+          >
+            Privacy &amp; Methodology
+          </button>
+        </nav>
       </header>
+
+      {activePage === 'privacy-methodology' && (
+        <section className="policy-page" aria-labelledby="policy-title">
+          <div className="policy-hero">
+            <p className="eyebrow">Transparency Notes</p>
+            <h2 id="policy-title">Privacy &amp; Methodology</h2>
+            <p>
+              BuildingPulse is an MVP decision-support tool for reviewing operational HVAC
+              patterns. It documents observed activity from the uploaded data; it does not
+              introduce new analytics or replace professional engineering judgment.
+            </p>
+          </div>
+
+          <article className="policy-section">
+            <div>
+              <p className="summary-label">01</p>
+              <h3>Data Privacy</h3>
+            </div>
+            <div className="policy-copy">
+              <p className="policy-callout">
+                Your building data stays in your browser. BuildingPulse processes uploaded CSV
+                files locally and does not require building data to be sent to a BuildingPulse
+                server for analysis.
+              </p>
+              <ul>
+                <li>CSV files are processed locally in the user&apos;s browser.</li>
+                <li>
+                  BuildingPulse does not intentionally upload CSV contents to a backend or external
+                  database.
+                </li>
+                <li>Uploaded files are used only for the current analysis session.</li>
+                <li>The MVP does not require accounts or personal information.</li>
+                <li>Included sample datasets are synthetic demo data.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article className="policy-section">
+            <div>
+              <p className="summary-label">02</p>
+              <h3>Analysis Methodology</h3>
+            </div>
+            <div className="policy-copy">
+              <p>
+                BuildingPulse reads timestamped HVAC demand and occupancy records, estimates HVAC
+                interval energy, separates occupied and unoccupied periods, and compares observed
+                patterns against the building setup provided for the analysis session.
+              </p>
+              <div className="method-grid">
+                <div className="method-card">
+                  <h4>Unoccupied HVAC Energy</h4>
+                  <p>
+                    Percentage of observed HVAC energy occurring during unoccupied periods.
+                  </p>
+                </div>
+                <div className="method-card">
+                  <h4>Startup &amp; Shutdown</h4>
+                  <p>
+                    HVAC activity before occupancy begins and after occupancy ends.
+                  </p>
+                </div>
+                <div className="method-card">
+                  <h4>Closed-Day Activity</h4>
+                  <p>
+                    HVAC energy occurring on days configured as normally closed.
+                  </p>
+                </div>
+                <div className="method-card">
+                  <h4>Unoccupied Load Ratio</h4>
+                  <p>
+                    Average unoccupied HVAC demand compared with average occupied demand.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="policy-section">
+            <div>
+              <p className="summary-label">03</p>
+              <h3>Prototype Thresholds &amp; Assumptions</h3>
+            </div>
+            <div className="policy-copy">
+              <p>
+                Low, Moderate, and High classifications use MVP prototype thresholds from the same
+                centralized severity configuration used by the diagnostic engine. They are review
+                heuristics, not professional engineering standards.
+              </p>
+              <div className="threshold-table-wrapper">
+                <table className="threshold-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Diagnostic</th>
+                      <th scope="col">Basis</th>
+                      <th scope="col">Low</th>
+                      <th scope="col">Moderate</th>
+                      <th scope="col">High</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {thresholdSummaries.map((threshold) => (
+                      <tr key={threshold.name}>
+                        <th scope="row">{threshold.name}</th>
+                        <td>{threshold.basis}</td>
+                        <td>
+                          Below {formatThreshold(threshold.thresholds.moderateMin, threshold.unit)}
+                        </td>
+                        <td>
+                          {formatThreshold(threshold.thresholds.moderateMin, threshold.unit)} to{' '}
+                          {formatThreshold(threshold.thresholds.highAbove, threshold.unit)}
+                        </td>
+                        <td>
+                          Above {formatThreshold(threshold.thresholds.highAbove, threshold.unit)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="policy-callout warning">
+                Significant startup/shutdown activity means HVAC demand is at least{' '}
+                {formatThreshold(HVAC_ACTIVITY_THRESHOLD * 100, '%')} of that day&apos;s maximum
+                HVAC demand. This is a prototype analytical assumption, not a threshold established
+                by Trane Technologies, DOE, ENERGY STAR, ASHRAE, or another industry authority.
+              </p>
+            </div>
+          </article>
+
+          <article className="policy-section">
+            <div>
+              <p className="summary-label">04</p>
+              <h3>Limitations &amp; Interpretation</h3>
+            </div>
+            <div className="policy-copy">
+              <p className="policy-callout">
+                BuildingPulse identifies operational patterns that may warrant further review.
+                Results should be treated as decision-support information rather than confirmed
+                equipment faults, energy waste, or guaranteed savings.
+              </p>
+              <ul>
+                <li>Unoccupied HVAC activity is not automatically wasted energy.</li>
+                <li>Early startup may be required for building preconditioning.</li>
+                <li>
+                  After-hours HVAC may support occupants, maintenance, ventilation, humidity
+                  control, or other operational needs.
+                </li>
+                <li>Closed-day activity may have legitimate operational explanations.</li>
+                <li>BuildingPulse does not diagnose HVAC equipment faults.</li>
+                <li>Results are not a professional energy audit.</li>
+                <li>Results do not guarantee potential energy or cost savings.</li>
+                <li>
+                  The MVP does not account for every factor affecting HVAC performance, such as
+                  equipment characteristics, control sequences, weather, humidity, ventilation
+                  requirements, or thermal behavior.
+                </li>
+              </ul>
+            </div>
+          </article>
+        </section>
+      )}
+
+      {activePage === 'dashboard' && (
+        <>
 
       <section className="hero" aria-labelledby="overview-title">
         <div className="hero-copy">
@@ -656,6 +875,8 @@ function App() {
             </button>
           </div>
         </section>
+      )}
+        </>
       )}
     </main>
   );
