@@ -11,6 +11,14 @@ The app helps developers and reviewers identify common operational inefficiencie
 
 All analysis runs locally in the browser. The project has no backend, database, authentication layer, or external data service.
 
+## Use the Hosted App
+
+Non-technical users can use the deployed Vercel URL directly without installing Node.js, npm, or GitHub.
+
+Open the app here: [https://building-hvac-analyzer.vercel.app/](https://building-hvac-analyzer.vercel.app/)
+
+Uploaded CSV data is analyzed in the browser. Files are not intentionally stored because the app has no backend.
+
 ## Project Context
 
 Developed as part of the IBM SkillsBuild Micro-Internship for Trane Technologies.
